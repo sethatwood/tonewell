@@ -401,4 +401,10 @@ async function diagnostics(): Promise<void> {
   }
 }
 
-void boot();
+void boot().catch(async (err) => {
+  // Whatever went wrong, never leave the person with an invisible app.
+  console.error('Tonewell: start-up failed', err);
+  void invoke('debug_log', { line: `start-up failed: ${String(err)}` }).catch(() => undefined);
+  const w = await currentWindow();
+  await w?.show();
+});
