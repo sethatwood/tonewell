@@ -50,8 +50,9 @@ starts.
 
 ## 3. Every sound is generated
 
-**Decision.** There are no recordings. The drone, beats, bells and breath
-are oscillators and filtered noise; rain, ocean, wind, noise beds and the
+**Decision.** There are no recordings. The drone, beats, bells, breath and
+the wordless voices (a small formant choir) are oscillators and filtered
+noise; rain, ocean, wind, noise beds and the
 Shepard rise are generated sample by sample in an AudioWorklet
 (`src/audio/worklets/processors.js`). The reverb uses a generated
 exponential-decay noise impulse, as in the prototype.
@@ -130,15 +131,15 @@ no visuals open there is no WebGL context and no animation loop. The mini
 player's only motion is a CSS opacity animation in Meditate (paused when
 the window is hidden), timed to the drone's filter sweep.
 
-Scenes share one fragment shader, chosen by uniform, and cross-fade over
-9 s. Photosensitivity measures: every brightness input is smoothed (time
+The ten scenes share one fragment shader, chosen by uniform, and
+cross-fade over 9 s. Photosensitivity measures: every brightness input is smoothed (time
 constants of 1 s or more) and slew-limited; there's a global brightness
 cap that Calm visuals lowers further; the beat frequency is never fed to
 the picture; Esc fades to dark within about a second; and a note about
 photosensitive epilepsy appears before the first use.
 
-**Revisit when** there are more than about eight scenes: compile one
-program per scene and cross-fade by blending.
+**Revisit when** compile time or GPU cost grows with more scenes: compile
+one program per scene and cross-fade by blending.
 
 ## 10. Native touches are behind platform checks
 

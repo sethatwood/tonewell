@@ -36,7 +36,9 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": [
+      "app"
+    ],
     "category": "Music",
     "shortDescription": "Generative drones and binaural beats for meditation and deep focus",
     "copyright": "© 2026 Seth Atwood. MIT License.",
