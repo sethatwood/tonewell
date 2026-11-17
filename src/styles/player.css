@@ -98,12 +98,14 @@ body {
   opacity: 0;
 }
 .well-lap {
+  opacity: 0;
   fill: none;
   stroke: var(--accent);
   stroke-width: 1;
   transition: opacity var(--t-text) var(--ease-ui);
 }
 .well-pin {
+  opacity: 0;
   fill: var(--ink);
   stroke: var(--ground);
   stroke-width: 2;
