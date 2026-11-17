@@ -65,7 +65,9 @@ async function resize(): Promise<void> {
   if (!w) return;
   const { LogicalSize, LogicalPosition } = await import('@tauri-apps/api/dpi');
   const { currentMonitor } = await import('@tauri-apps/api/window');
-  await w.setSize(new LogicalSize(400, height));
+  const animate = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Grow and shrink from the top edge, with the system's own animation.
+  await invoke('resize_player', { height, animate }).catch(() => w.setSize(new LogicalSize(400, height)));
   // Grow downward, unless that would run off the bottom of the screen.
   try {
     const mon = await currentMonitor();

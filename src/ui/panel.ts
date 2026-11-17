@@ -142,6 +142,7 @@ export class Panel {
     const head = h('div', { class: 'layer-head' });
     if (l.on) {
       const onId = l.on;
+      this.soundRefresher((s) => row.toggleAttribute('data-off', !s.params[onId]));
       const sw = switchControl(`${l.label} on`, !!this.session.params[onId], (v) => this.set(onId, v ? 1 : 0), true);
       this.soundRefresher((s) => sw.set(!!s.params[onId]));
       head.append(sw.el);

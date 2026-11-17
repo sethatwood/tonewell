@@ -485,6 +485,11 @@ body {
 .layer-name {
   font-weight: 600;
   font-size: 14px;
+  transition: opacity var(--t-ui) var(--ease-ui);
+}
+.layer[data-off] .layer-name,
+.layer[data-off] .layer-level {
+  opacity: 0.5;
 }
 .layer-level .scale-head {
   display: none;

@@ -126,6 +126,36 @@ fn media_state(app: AppHandle, state: String, title: String) {
     media::set_state(&app, state, title);
 }
 
+/// Resize the mini player keeping its top edge in place. On macOS this uses
+/// the system's own frame animation, unless `animate` is false (Reduce motion).
+#[tauri::command]
+fn resize_player(window: tauri::WebviewWindow, height: f64, animate: bool) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let ns = window.ns_window().map_err(|e| e.to_string())? as usize;
+        window
+            .run_on_main_thread(move || unsafe {
+                use objc2_app_kit::NSWindow;
+                let w: &NSWindow = &*(ns as *const NSWindow);
+                let mut frame = w.frame();
+                let top = frame.origin.y + frame.size.height;
+                frame.size.height = height;
+                frame.origin.y = top - height;
+                w.setFrame_display_animate(frame, true, animate);
+            })
+            .map_err(|e| e.to_string())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = animate;
+        let size = window.inner_size().map_err(|e| e.to_string())?;
+        let scale = window.scale_factor().map_err(|e| e.to_string())?;
+        window
+            .set_size(tauri::LogicalSize::new(size.width as f64 / scale, height))
+            .map_err(|e| e.to_string())
+    }
+}
+
 #[tauri::command]
 fn audio_output() -> Option<output::OutputInfo> {
     output::current()
@@ -199,7 +229,7 @@ pub fn run() {
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_opener::init())
         .manage(Awake::default())
-        .invoke_handler(tauri::generate_handler![tray_update, set_keep_awake, audio_output, media_state, quit_now, debug_flags, debug_log])
+        .invoke_handler(tauri::generate_handler![tray_update, set_keep_awake, audio_output, media_state, resize_player, quit_now, debug_flags, debug_log])
         .setup(|app| {
             let handle = app.handle().clone();
             let start = build_menu(
