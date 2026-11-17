@@ -232,3 +232,24 @@ a:hover {
 .settings {
   font-variant-numeric: proportional-nums;
 }
+
+.log-list {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+.log-list li {
+  display: grid;
+  grid-template-columns: 1.4fr 1.2fr auto;
+  gap: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-2);
+}
+.log-list li span:nth-child(2) {
+  color: var(--ink);
+}

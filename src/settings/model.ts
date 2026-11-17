@@ -14,6 +14,7 @@ export interface AppSettings {
   audioReactivity: number;
   visualsWarned: boolean;
   firstRunDone: boolean;
+  keepLog: boolean;
 }
 
 export const SETTINGS_DEFAULT: AppSettings = {
@@ -27,7 +28,33 @@ export const SETTINGS_DEFAULT: AppSettings = {
   audioReactivity: 0.4,
   visualsWarned: false,
   firstRunDone: false,
+  keepLog: true,
 };
+
+/** One finished session, kept only on this Mac. */
+export interface LogEntry {
+  at: string;
+  minutes: number;
+  preset: string;
+  mode: 'meditate' | 'focus';
+}
+
+export async function loadLog(): Promise<LogEntry[]> {
+  const doc = await loadDoc();
+  return Array.isArray(doc.sessionLog) ? (doc.sessionLog as LogEntry[]) : [];
+}
+
+export async function appendLog(entry: LogEntry): Promise<void> {
+  const settings = await loadSettings();
+  if (!settings.keepLog) return;
+  const log = await loadLog();
+  log.push(entry);
+  await patchDoc({ sessionLog: log.slice(-1000) }, true);
+}
+
+export async function clearLog(): Promise<void> {
+  await patchDoc({ sessionLog: [] }, true);
+}
 
 export async function loadSettings(): Promise<AppSettings> {
   const doc = await loadDoc();

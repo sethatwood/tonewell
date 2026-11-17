@@ -2,7 +2,7 @@
 // mini player's panel; this window is for how the app behaves.
 
 import '../styles/pages.css';
-import { GLOBAL_SHORTCUTS, loadSettings, saveSettings, type AppSettings } from './model';
+import { GLOBAL_SHORTCUTS, clearLog, loadLog, loadSettings, saveSettings, type AppSettings, type LogEntry } from './model';
 import { h, scale, switchControl } from '../ui/controls';
 import { emit, isTauri, openExternal } from '../platform/bridge';
 
@@ -50,6 +50,30 @@ async function boot(): Promise<void> {
     onInput: (p) => void save({ audioReactivity: Math.round(p * 100) / 100 }),
   });
 
+  const keepLog = switchControl('Keep a log of sessions', s.keepLog, (on) => void save({ keepLog: on }), true);
+  const logBox = h('div', { class: 'log' });
+  const renderLog = (log: LogEntry[]) => {
+    const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
+    const week = log.filter((e) => new Date(e.at).getTime() >= weekAgo);
+    const minutes = week.reduce((a, e) => a + e.minutes, 0);
+    const fmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    logBox.replaceChildren(
+      h('p', { class: 'set-help' }, log.length === 0
+        ? 'Nothing here yet. Finished sessions of a minute or more appear here, on this Mac only.'
+        : `In the last seven days: ${week.length} ${week.length === 1 ? 'session' : 'sessions'}, ${minutes} minutes.`),
+      ...(log.length
+        ? [h('ol', { class: 'log-list' }, ...log.slice(-12).reverse().map((e) => h('li', {}, h('span', {}, fmt.format(new Date(e.at))), h('span', {}, e.preset), h('span', {}, `${e.minutes} min`))))]
+        : []),
+    );
+  };
+  void loadLog().then(renderLog);
+  const clear = h('button', { class: 'btn quiet' }, 'Clear the log');
+  clear.addEventListener('click', async () => {
+    await clearLog();
+    await emit('settings-changed');
+    renderLog([]);
+  });
+
   const repo = h('a', { href: 'https://github.com/sethatwood/tonewell' }, 'github.com/sethatwood/tonewell');
   repo.addEventListener('click', (e) => {
     e.preventDefault();
@@ -76,6 +100,11 @@ async function boot(): Promise<void> {
         h('div', { class: 'set-scale' }, cap.el),
         h('div', { class: 'set-scale' }, react.el),
         h('p', { class: 'set-help' }, 'Brightness never changes faster than three times a second, whatever you set here.'),
+      ),
+      h('section', {}, h('h2', {}, 'Sessions'),
+        row('Keep a log of sessions', 'Just the date, length and preset. No streaks, no goals, nothing to keep up.', keepLog.el),
+        logBox,
+        h('div', {}, clear),
       ),
       h('section', {}, h('h2', {}, 'About'),
         h('p', {}, 'Tonewell makes every sound on your Mac as it plays: nothing is recorded, nothing is streamed, and nothing about how you use it leaves this computer.'),

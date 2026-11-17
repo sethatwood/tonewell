@@ -16,6 +16,7 @@ import { PARAMS, clampParam, defaultParams, mergeParams, type ParamId, type Soun
 import { BUILTIN_PRESETS, presetParams, type Mode, type Preset } from '../presets/builtin';
 import { loadDoc, patchDoc } from '../platform/store';
 import { invoke } from '../platform/bridge';
+import { appendLog } from '../settings/model';
 
 export type { Mode } from '../presets/builtin';
 export type Phase = 'ready' | 'playing' | 'winding' | 'resting' | 'ending';
@@ -428,6 +429,10 @@ export class Session extends EventTarget {
 
   private finish(): void {
     this.clearPhaseTimer();
+    const played = this.ctx && this.startedWall ? this.ctx.currentTime - this.startAt : 0;
+    if (played >= 60) {
+      void appendLog({ at: (this.startedWall ?? new Date()).toISOString(), minutes: Math.round(played / 60), preset: this.preset.name, mode: this.mode });
+    }
     this.engine?.dispose();
     this.engine = null;
     void this.ctx?.suspend();

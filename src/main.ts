@@ -263,6 +263,11 @@ addEventListener('keydown', (e) => {
     return;
   }
   if (inText) return;
+  if (!mod && key === ' ' && (document.activeElement === document.body || document.activeElement === null)) {
+    e.preventDefault();
+    void session.go();
+    return;
+  }
   if (mod && key === 'ArrowUp') session.nudgeVolume(0.05);
   else if (mod && key === 'ArrowDown') session.nudgeVolume(-0.05);
   else if (!mod && (key === '+' || key === '=')) session.wind(5);
