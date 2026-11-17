@@ -89,3 +89,47 @@ p, li { text-wrap: pretty; }
 [data-taste][data-playing="true"] .taste__play { display: none; }
 [data-taste][data-playing="true"] .taste__stop { display: block; }
 .hero .player[data-tasting="false"] .ripple__glow { animation-play-state: paused; }
+
+/* Visuals: a live panel running the app's renderer, a poster until it starts, and the scene picker. */
+.screen { position: relative; margin-top: 36px; aspect-ratio: 16 / 10; border-radius: 28px; overflow: hidden; background: #000; border: 1px solid var(--line); }
+.screen__canvas, .screen__poster { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.screen__poster { object-fit: cover; transition: opacity 1.2s var(--ease-out); }
+.screen__canvas { opacity: 0; }
+.screen::after { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse 70% 60% at 50% 55%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.15)); transition: opacity 1.2s var(--ease-out); pointer-events: none; }
+.screen__start { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; transition: opacity 0.6s var(--ease-out); }
+.screen__note { max-width: 420px; margin: 0; font-size: 13.5px; line-height: 1.55; color: rgba(255, 255, 255, 0.78); }
+.screen__nogl { display: none; margin: 0; font-size: 14px; color: rgba(255, 255, 255, 0.85); }
+.screen__bar { position: absolute; left: 50%; bottom: 16px; z-index: 2; transform: translate(-50%, 8px); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 8px; width: max-content; max-width: calc(100% - 24px); padding: 8px 12px; border-radius: 22px; background: rgba(12, 14, 24, 0.78); box-shadow: 0 0 0 1px var(--line); opacity: 0; pointer-events: none; transition: opacity 0.6s var(--ease-out), transform 0.6s var(--ease-out); }
+.screen__name { min-width: 8.5em; text-align: center; font-weight: 600; font-size: 15px; color: var(--ink); }
+.screen__bar .chip[aria-pressed="true"] { background: var(--accent-wash); border-color: var(--accent); }
+.screen[data-state="running"] .screen__canvas { opacity: 1; }
+.screen[data-state="running"] .screen__poster, .screen[data-state="running"]::after { opacity: 0; }
+.screen[data-state="running"] .screen__start { opacity: 0; pointer-events: none; }
+.screen[data-state="running"] .screen__bar { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+.screen[data-state="no-webgl"] .screen__nogl { display: block; }
+.screen[data-state="no-webgl"] [data-watch], .screen[data-state="no-webgl"] .screen__note { display: none; }
+.screen:fullscreen { border-radius: 0; border: 0; aspect-ratio: auto; width: 100%; height: 100%; margin: 0; }
+.screen:-webkit-full-screen { border-radius: 0; border: 0; aspect-ratio: auto; width: 100%; height: 100%; margin: 0; }
+.scenes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px 14px; margin-top: 22px; }
+.scene { display: flex; flex-direction: column; gap: 8px; padding: 0; border: 0; background: none; color: var(--ink-2); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.scene img { width: 100%; height: auto; aspect-ratio: 16 / 10; border-radius: 14px; border: 1px solid var(--line); display: block; background: #000; }
+.scene:hover img { border-color: var(--track); }
+.scene[aria-pressed="true"] { color: var(--ink); }
+.scene[aria-pressed="true"] img { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.vis-facts { list-style: none; padding: 0; margin: 36px 0 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; }
+.vis-facts li { font-size: 14px; line-height: 1.55; color: var(--ink-2); }
+.vis-facts b { display: block; margin-bottom: 4px; color: var(--ink); font-weight: 600; }
+@media (max-width: 900px) {
+  .scenes { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 168px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; }
+  .scene { scroll-snap-align: start; }
+  .vis-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 440px) {
+  .screen { aspect-ratio: 4 / 5; border-radius: 22px; }
+  .screen__bar { bottom: 10px; padding: 6px 8px; }
+  .screen__name { min-width: 0; flex-basis: calc(100% - 80px); }
+  .vis-facts { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .screen__poster, .screen::after, .screen__start, .screen__bar { transition-duration: 0.01s; }
+}

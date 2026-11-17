@@ -223,8 +223,24 @@ Deep Theta from the app's real engine. `npm run site` builds it from
 server never runs a build. The engine is a separate file that loads only
 when the button is pressed. Nothing on the page autoplays.
 
+The visuals panel works the same way: it runs the app's own renderer
+and shader, loaded only when "Watch the visuals" is pressed, next to a
+note about light. The stills around it are rendered from the same code
+(`npm run site:scenes`).
+
 **Why.** The site keeps the app's own promise: no cookies, no analytics,
 no third-party requests. Plain files keep it that way and keep deploys
 simple. Playing the real engine rather than a recording means the taste
 is the actual sound, with no recording to make or keep in step.
+
+## 17. One renderer holds the visuals' limits
+
+**Decision.** `src/visuals/renderer.ts` owns the WebGL program, scene
+cross-fades and every smoothing and rate limit on brightness. The
+Visuals window and the website only choose targets (how bright, how
+fast, how much to follow the sound), and both pass through the same
+limits.
+
+**Why.** The 3 Hz rule should live in one place that no host can skip.
+A second copy for the website would drift from the app's.
 

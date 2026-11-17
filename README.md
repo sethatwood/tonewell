@@ -129,12 +129,15 @@ and Linux builds should work but haven't been tried.
   device changes.
 - `src/ui` is the mini player, the well, the panel and the menu-bar menu.
 - `src/visuals`, `src/learn` and `src/settings` are the other windows.
+  `src/visuals/renderer.ts` holds the visuals' brightness limits for
+  both the app and the website.
 - `src-tauri` is the native shell: menu bar, keep-awake, output watching,
   window lifecycle.
 - `site` is [tonewell.space](https://tonewell.space): static files,
-  deployed when `main` is pushed. Its one script, the "Hear a taste"
-  button, is built from the app's own engine (`src/site`) with
-  `npm run site`, and `npm run site:og` renders its link preview.
+  deployed when `main` is pushed. Its script, for the "Hear a taste"
+  button and the live visuals panel, is built from the app's own engine
+  and renderer (`src/site`) with `npm run site`. `npm run site:scenes`
+  renders its scene stills and `npm run site:og` its link preview.
 
 The reasoning behind the bigger choices is in
 [docs/decisions.md](docs/decisions.md).

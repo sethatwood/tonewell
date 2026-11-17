@@ -2,7 +2,8 @@
 // app's own engine, at a modest fixed level, faded in over 4 s and out over
 // 6 s. Stopping early fades too: nothing on the page cuts off.
 
-import { WebAudioEngine } from '../audio/engine';
+import { WebAudioEngine, type Levels } from '../audio/engine';
+import { chordRatio } from '../visuals/chords';
 import { BUILTIN_PRESETS, presetParams } from '../presets/builtin';
 import workletUrl from '../audio/worklets/processors.js?url';
 
@@ -14,6 +15,10 @@ const VOLUME = 0.55;
 
 export interface Taste {
   stop(): void;
+  /** Loudness and low and high energy now, for the visuals to follow. */
+  levels(): Levels;
+  /** The drone's chord, for the Harmonograph. */
+  readonly ratio: [number, number];
 }
 
 /** Plays on `ctx`, which the caller makes inside the click so the browser lets it sound. Closes it when done. */
@@ -21,7 +26,8 @@ export async function play(ctx: AudioContext, onEnd: () => void): Promise<Taste>
   const preset = BUILTIN_PRESETS.find((p) => p.id === 'deep-theta');
   if (!preset) throw new Error('Deep Theta preset is missing');
   if (ctx.state !== 'running') await ctx.resume();
-  const engine = await WebAudioEngine.create(ctx, presetParams(preset), { workletUrl, volume: VOLUME });
+  const params = presetParams(preset);
+  const engine = await WebAudioEngine.create(ctx, params, { workletUrl, volume: VOLUME });
   engine.fade(1, FADE_IN);
   engine.scheduleEnd(ctx.currentTime + SECONDS - FADE_OUT, FADE_OUT);
 
@@ -37,6 +43,8 @@ export async function play(ctx: AudioContext, onEnd: () => void): Promise<Taste>
   }
 
   return {
+    ratio: chordRatio(params.voicing),
+    levels: () => (done ? { rms: 0, low: 0, high: 0 } : engine.levels()),
     stop() {
       if (done) return;
       engine.fade(0, STOP_FADE);
