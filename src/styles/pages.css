@@ -4,13 +4,11 @@ body {
   overflow: hidden;
 }
 
-/* The title bar is transparent; this strip makes it draggable and keeps text clear of the traffic lights. */
-body::before {
-  content: '';
+/* The title bar is transparent; this strip (data-tauri-drag-region) moves the window. */
+.drag-strip {
   position: fixed;
   inset: 0 0 auto 0;
   height: 28px;
-  -webkit-app-region: drag;
   z-index: 5;
 }
 

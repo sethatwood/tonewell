@@ -2,9 +2,10 @@
 // mini player's panel; this window is for how the app behaves.
 
 import '../styles/pages.css';
-import { GLOBAL_SHORTCUTS, clearLog, loadLog, loadSettings, saveSettings, type AppSettings, type LogEntry } from './model';
+import { GLOBAL_SHORTCUTS, clearLog, loadLog, loadSettings, patchSettings, type AppSettings, type LogEntry } from './model';
 import { h, scale, switchControl } from '../ui/controls';
-import { emit, isTauri, openExternal } from '../platform/bridge';
+import { emit, isTauri, listen, openExternal } from '../platform/bridge';
+import { reloadDoc } from '../platform/store';
 
 document.title = 'Tonewell Settings';
 document.documentElement.dataset.mode = 'meditate';
@@ -17,9 +18,7 @@ async function autostart() {
 async function boot(): Promise<void> {
   let s: AppSettings = await loadSettings();
   const save = async (patch: Partial<AppSettings>) => {
-    s = { ...s, ...patch };
-    await saveSettings(s);
-    await emit('settings-changed');
+    s = await patchSettings(patch);
   };
 
   const row = (label: string, help: string | null, control: HTMLElement) =>
@@ -119,4 +118,19 @@ async function boot(): Promise<void> {
   );
 }
 
-void boot();
+let rendering = false;
+async function rebuild(): Promise<void> {
+  if (rendering) return;
+  rendering = true;
+  const scroll = document.querySelector('.settings')?.scrollTop ?? 0;
+  const focusedLabel = (document.activeElement as HTMLElement | null)?.getAttribute('aria-label');
+  await reloadDoc();
+  document.querySelector('.settings')?.remove();
+  await boot();
+  const main = document.querySelector('.settings');
+  if (main) main.scrollTop = scroll;
+  if (focusedLabel) document.querySelector<HTMLElement>(`[aria-label="${CSS.escape(focusedLabel)}"]`)?.focus();
+  rendering = false;
+}
+
+void boot().then(() => listen('settings-changed', () => void rebuild()));

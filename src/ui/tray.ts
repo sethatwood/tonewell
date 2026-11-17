@@ -61,6 +61,11 @@ export function trayMenu(session: Session, s: Snapshot, shortcuts: boolean): Men
 }
 
 let lastJson = '';
+
+/** Forget what was last sent, e.g. after a click toggled a check mark by itself. */
+export function invalidateTray(): void {
+  lastJson = '';
+}
 /** The last menu-bar update error, for diagnostics. */
 export let trayError: string | null = null;
 

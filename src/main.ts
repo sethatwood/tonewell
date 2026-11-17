@@ -4,12 +4,12 @@
 import { Session, type Phase } from './session/session';
 import { Player, handleMenuId, type PlayerActions } from './ui/player';
 import { Panel } from './ui/panel';
-import { trayError, updateTray } from './ui/tray';
+import { invalidateTray, trayError, updateTray } from './ui/tray';
 import { check, item, popup, sep, submenu } from './ui/menu';
 import { h } from './ui/controls';
 import { currentWindow, emitTo, invoke, isTauri, isWindowOpen, listen, openWindow } from './platform/bridge';
 import { flushNow } from './platform/store';
-import { GLOBAL_SHORTCUTS, loadSettings, saveSettings, type AppSettings } from './settings/model';
+import { GLOBAL_SHORTCUTS, loadSettings, patchSettings, type AppSettings } from './settings/model';
 
 const session = new Session();
 const app = document.getElementById('app')!;
@@ -30,6 +30,8 @@ function ask(question: string, initial: string): Promise<string | null> {
     await w?.show();
     await w?.setFocus();
   });
+  const returnFocus = document.activeElement as HTMLElement | null;
+  const wasExpanded = expanded;
   return new Promise((resolve) => {
     const input = h('input', { type: 'text', value: initial, id: 'ask-input', autocomplete: 'off', spellcheck: 'false' });
     const cancel = h('button', { type: 'button', class: 'btn quiet' }, 'Cancel');
@@ -38,6 +40,8 @@ function ask(question: string, initial: string): Promise<string | null> {
     const wrap = h('div', { class: 'ask', role: 'dialog', 'aria-modal': 'true', 'aria-label': question }, form);
     const close = (v: string | null) => {
       wrap.remove();
+      if (!wasExpanded) void setExpanded(false);
+      returnFocus?.focus();
       resolve(v);
     };
     form.addEventListener('submit', (e) => {
@@ -49,6 +53,12 @@ function ask(question: string, initial: string): Promise<string | null> {
       if (e.key === 'Escape') {
         e.stopPropagation();
         close(null);
+      } else if (e.key === 'Tab') {
+        // Keep focus inside the dialog.
+        const items = [input, cancel, ok];
+        const i = items.indexOf(document.activeElement as HTMLInputElement & HTMLButtonElement);
+        e.preventDefault();
+        items[(i + (e.shiftKey ? items.length - 1 : 1)) % items.length].focus();
       }
     });
     if (!expanded) void setExpanded(true);
@@ -110,6 +120,7 @@ async function snapTo(corner: 'tl' | 'tr' | 'bl' | 'br'): Promise<void> {
 
 const actions: PlayerActions = {
   toggleExpanded: () => void setExpanded(!expanded),
+  expand: () => void setExpanded(true),
   openVisuals: () => void openVisuals(),
   openLearn: (card) => void openLearn(card),
   openSettings: () =>
@@ -158,7 +169,13 @@ let registeredShortcuts = false;
 async function applySettings(next: AppSettings, save = false): Promise<void> {
   const prev = settings;
   settings = next;
-  if (save) await saveSettings(settings);
+  if (save) {
+    const changed: Partial<AppSettings> = {};
+    for (const k of Object.keys(next) as Array<keyof AppSettings>) {
+      if (prev?.[k] !== next[k]) (changed as Record<string, unknown>)[k] = next[k];
+    }
+    settings = await patchSettings(changed);
+  }
   app.classList.toggle('folded', settings.folded);
   const w = await currentWindow();
   if (w && prev?.alwaysOnTop !== settings.alwaysOnTop) await w.setAlwaysOnTop(settings.alwaysOnTop);
@@ -320,6 +337,13 @@ setInterval(async () => {
   if (visualsOpen && isTauri) visualsOpen = await isWindowOpen('visuals');
 }, 3000);
 
+// The menu bar's minutes-left title counts down (updates only when the text changes).
+setInterval(() => {
+  if (settings?.showTimeInMenuBar && session.phase === 'playing') {
+    void updateTray(session, session.snapshot(), { shortcuts: settings.shortcutsEnabled, showTime: true });
+  }
+}, 15000);
+
 // ---------- boot ----------
 
 async function boot(): Promise<void> {
@@ -335,12 +359,19 @@ async function boot(): Promise<void> {
       session.output = out;
       render();
     }
-    await listen<string>('tray-action', (id) => void runAction(id));
+    await listen<string>('tray-action', (id) => {
+      // The system flips a clicked check mark by itself; resend the true state.
+      invalidateTray();
+      void runAction(id).finally(() => void updateTray(session, session.snapshot(), { shortcuts: settings.shortcutsEnabled, showTime: settings.showTimeInMenuBar }));
+    });
     await listen('audio-output', (c) => session.onOutputChange(c as Parameters<Session['onOutputChange']>[0]));
     await listen<boolean>('mic-in-use', (busy) => {
       micBusy = busy;
       session.setDucked(busy && settings.softenForCalls);
     });
+    // The watcher's first report can arrive before this listener existed: ask once now.
+    micBusy = (await invoke<boolean>('mic_in_use')) ?? false;
+    session.setDucked(micBusy && settings.softenForCalls);
     await listen('quit-requested', async () => {
       await session.quit();
       await flushNow();

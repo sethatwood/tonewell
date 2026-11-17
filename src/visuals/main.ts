@@ -10,8 +10,8 @@
 // - Esc fades to dark at once (over about a second, never a cut).
 
 import { EMBER, PALETTES, SCENES, FRAG, VERT } from './shader';
-import { emit, emitTo, listen, currentWindow, isTauri } from '../platform/bridge';
-import { loadSettings, saveSettings, type AppSettings } from '../settings/model';
+import { emitTo, listen, currentWindow, isTauri } from '../platform/bridge';
+import { loadSettings, patchSettings, type AppSettings } from '../settings/model';
 import { h } from '../ui/controls';
 
 interface Frame {
@@ -116,6 +116,8 @@ const state = {
   palette: 0,
   nextPalette: 0,
   palMix: 0,
+  /** A scene asked for while a cross-fade is running; it starts when the fade ends. */
+  queued: null as number | null,
 };
 // Smoothed values actually sent to the shader.
 const live = { fade: 0, bright: 0, sat: 1.6, bass: 0, hi: 0, flow: 1, pacer: 0 };
@@ -130,18 +132,28 @@ function approach(v: number, target: number, dt: number, tau: number, maxRate: n
 }
 
 const nameEl = h('span', { class: 'name', 'aria-live': 'polite' });
-function setName(): void {
-  nameEl.textContent = SCENES[state.mixing ? state.next : state.scene];
+/** The scene the picture is heading to: queued, else cross-fading to, else showing. */
+function target(): number {
+  return state.queued ?? (state.mixing ? state.next : state.scene);
 }
+function setName(): void {
+  nameEl.textContent = SCENES[target()];
+}
+/**
+ * Move to scene k. A change never interrupts a cross-fade (that would be a hard
+ * cut, and repeated presses could flash): it waits, and only the latest request
+ * is kept.
+ */
 function goTo(k: number): void {
   const n = SCENES.length;
   k = ((k % n) + n) % n;
   if (state.mixing) {
-    state.scene = state.next;
-    state.mixv = 0;
+    state.queued = k === state.next ? null : k;
+    setName();
+    return;
   }
+  state.queued = null;
   if (k === state.scene) {
-    state.mixing = false;
     setName();
     return;
   }
@@ -184,6 +196,11 @@ function draw(now: number): void {
       state.scene = state.next;
       state.mixv = 0;
       state.mixing = false;
+      if (state.queued !== null) {
+        const q = state.queued;
+        state.queued = null;
+        goTo(q);
+      }
     }
   }
   // Drift moves through the scenes in turn; Ember stays put once chosen.
@@ -255,7 +272,7 @@ function cyclePalette(): void {
   state.palMix = 0;
   paletteBtn?.replaceChildren(PALETTES[state.nextPalette].name);
   settings.visualsPalette = state.nextPalette;
-  void saveSettings(settings);
+  void patchSettings({ visualsPalette: state.nextPalette });
 }
 
 // ---------- controls ----------
@@ -286,8 +303,8 @@ async function closeWindow(): Promise<void> {
 function buildBar(): HTMLElement {
   const prev = h('button', { class: 'icon-btn', 'aria-label': 'Previous scene' }, '‹');
   const next = h('button', { class: 'icon-btn', 'aria-label': 'Next scene' }, '›');
-  prev.addEventListener('click', () => goTo((state.mixing ? state.next : state.scene) - 1));
-  next.addEventListener('click', () => goTo((state.mixing ? state.next : state.scene) + 1));
+  prev.addEventListener('click', () => goTo(target() - 1));
+  next.addEventListener('click', () => goTo(target() + 1));
   const drift = h('button', { class: 'btn', 'aria-pressed': 'true' }, 'Drift');
   drift.addEventListener('click', () => {
     state.drift = !state.drift;
@@ -308,8 +325,7 @@ function buildBar(): HTMLElement {
   calm.addEventListener('click', async () => {
     settings.calmVisuals = !settings.calmVisuals;
     calm.setAttribute('aria-pressed', String(settings.calmVisuals));
-    await saveSettings(settings);
-    void emit('settings-changed');
+    settings = await patchSettings({ calmVisuals: settings.calmVisuals });
   });
   pacerBtn = h('button', { class: 'btn', 'aria-pressed': 'false', title: 'A ring that grows as you breathe in and shrinks as you breathe out, 5.5 breaths a minute' }, 'Breath pacer');
   pacerBtn.addEventListener('click', () => {
@@ -381,13 +397,17 @@ addEventListener('keydown', (e) => {
     document.body.classList.remove('dark');
     return;
   }
+  if (e.repeat) return;
   if (e.key === 'f' || e.key === 'F') void toggleFullscreen();
-  else if (e.key === 'ArrowRight') goTo((state.mixing ? state.next : state.scene) + 1);
-  else if (e.key === 'ArrowLeft') goTo((state.mixing ? state.next : state.scene) - 1);
+  else if (e.key === 'ArrowRight') goTo(target() + 1);
+  else if (e.key === 'ArrowLeft') goTo(target() - 1);
   else if (e.key === 'e' || e.key === 'E') goTo(EMBER);
   else if (e.key === 'b' || e.key === 'B') pacerBtn?.click();
   else if (e.key === 'p' || e.key === 'P') cyclePalette();
-  else if (e.key === ' ') void emitTo('main', 'remote-action', 'go');
+  else if (e.key === ' ' && document.activeElement === document.body) {
+    e.preventDefault();
+    void emitTo('main', 'remote-action', 'go');
+  }
 });
 ['mousemove', 'pointerdown'].forEach((ev) => addEventListener(ev, poke, { passive: true }));
 canvas.addEventListener('dblclick', () => void toggleFullscreen());
@@ -411,8 +431,7 @@ async function boot(): Promise<void> {
       await closeWindow();
       return;
     }
-    await saveSettings(settings);
-    void emit('settings-changed');
+    settings = await patchSettings({ calmVisuals: settings.calmVisuals, visualsWarned: true });
   }
   if (!gl) {
     document.body.append(h('p', { style: 'color:#aaa;padding:24px' }, 'This Mac could not start WebGL, so the visuals can’t run here. The sound is unaffected.'));

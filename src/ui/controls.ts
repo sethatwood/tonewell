@@ -145,11 +145,14 @@ export function radios<T extends string | number>(
     }
   });
   const set = (v: T) => {
+    const any = options.some((o) => o.value === v);
     options.forEach((o, i) => {
       buttons[i].setAttribute('aria-checked', String(o.value === v));
-      buttons[i].tabIndex = o.value === v ? 0 : -1;
+      // Keep the group reachable by Tab even when no option matches.
+      buttons[i].tabIndex = o.value === v || (!any && i === 0) ? 0 : -1;
     });
   };
+  set(value);
   return { el: group, set };
 }
 

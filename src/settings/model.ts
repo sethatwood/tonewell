@@ -1,6 +1,7 @@
 // App preferences (as opposed to sound settings, which live with presets).
 
-import { loadDoc, patchDoc } from '../platform/store';
+import { loadDoc, patchDoc, reloadDoc } from '../platform/store';
+import { emit } from '../platform/bridge';
 
 export interface AppSettings {
   alwaysOnTop: boolean;
@@ -70,6 +71,18 @@ export async function loadSettings(): Promise<AppSettings> {
 
 export async function saveSettings(s: AppSettings): Promise<void> {
   await patchDoc({ settings: s }, true);
+}
+
+/**
+ * Change some settings without clobbering what other windows saved: re-read,
+ * merge, save, and tell every window.
+ */
+export async function patchSettings(patch: Partial<AppSettings>): Promise<AppSettings> {
+  await reloadDoc();
+  const next = { ...(await loadSettings()), ...patch };
+  await patchDoc({ settings: next }, true);
+  await emit('settings-changed');
+  return next;
 }
 
 /** Global shortcuts, used only when the person turns them on in Settings. */

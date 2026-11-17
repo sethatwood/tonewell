@@ -11,6 +11,8 @@ import { Well } from './well';
 
 export interface PlayerActions {
   toggleExpanded(): void;
+  /** Open the panel (never closes it). */
+  expand(): void;
   openVisuals(): void;
   openLearn(card?: string): void;
   openSettings(): void;
@@ -86,7 +88,7 @@ export async function handleMenuId(id: string, session: Session, actions: Player
   } else if (id.startsWith('beat:')) {
     const v = id.slice(5);
     if (v === 'more') {
-      actions.toggleExpanded();
+      actions.expand();
       document.dispatchEvent(new CustomEvent('tonewell:panel-tab', { detail: 'beat' }));
     } else if (v === 'off') session.setParam('beatOn', 0);
     else {
@@ -184,7 +186,11 @@ export class Player {
     });
     this.stopText = h('span', { class: 'stop-text' });
     this.stopBtn = h('button', { class: 'btn stop-btn' }, this.stopText, h('span', { class: 'kbd', 'aria-hidden': 'true' }, 'esc'));
-    this.stopBtn.addEventListener('click', () => session.escape());
+    // The button acts at once (Esc has a one-second guard against key repeat; a click doesn't need it).
+    this.stopBtn.addEventListener('click', () => {
+      if (session.phase === 'playing') void session.windDown();
+      else if (session.phase === 'winding' || session.phase === 'resting') session.end();
+    });
     this.hint = h('span', { class: 'first-hint' }, 'Headphones on, then start.');
     const rowC = h('div', { class: 'row-c', 'data-tauri-drag-region': true }, this.timeBtn, h('span', { class: 'stop-slot', 'data-tauri-drag-region': true }, this.stopBtn, this.hint));
 

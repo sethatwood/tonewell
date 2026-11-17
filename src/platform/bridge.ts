@@ -74,6 +74,7 @@ export async function openWindow(spec: WindowSpec): Promise<void> {
   const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
   const existing = await WebviewWindow.getByLabel(spec.label);
   if (existing) {
+    await existing.unminimize();
     await existing.show();
     await existing.setFocus();
     return;
@@ -107,6 +108,22 @@ export async function currentWindow() {
   if (!isTauri) return null;
   const { getCurrentWindow } = await import('@tauri-apps/api/window');
   return getCurrentWindow();
+}
+
+// Secondary windows have a transparent title bar: give them a strip to drag by.
+if (isTauri && typeof document !== 'undefined' && !location.pathname.endsWith('index.html') && location.pathname !== '/') {
+  const strip = document.createElement('div');
+  strip.className = 'drag-strip';
+  strip.setAttribute('data-tauri-drag-region', '');
+  strip.style.cssText = 'position:fixed;inset:0 0 auto 0;height:28px;z-index:5';
+  addEventListener('DOMContentLoaded', () => document.body.prepend(strip));
+}
+
+// WebKit's own right-click menu offers Reload, which would end a session abruptly.
+if (typeof window !== 'undefined') {
+  addEventListener('contextmenu', (e) => {
+    if (!(e.target as HTMLElement | null)?.closest?.('input, textarea')) e.preventDefault();
+  });
 }
 
 // Uncaught errors from any window go to the app's log (stderr), where

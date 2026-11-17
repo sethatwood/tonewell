@@ -163,15 +163,51 @@ mod mac {
         status == 0 && size > 0
     }
 
-    /// True when any app is recording from any input: the usual sign of a call.
+    const PROCESS_LIST: u32 = fourcc(b"prs#");
+    const PROCESS_RUNNING_INPUT: u32 = fourcc(b"piri");
+
+    fn process_objects() -> Option<Vec<u32>> {
+        let addr = Address { selector: PROCESS_LIST, scope: SCOPE_GLOBAL, element: 0 };
+        let mut size: u32 = 0;
+        if unsafe { AudioObjectGetPropertyDataSize(SYSTEM_OBJECT, &addr, 0, std::ptr::null(), &mut size) } != 0 {
+            return None;
+        }
+        let mut ids = vec![0u32; size as usize / std::mem::size_of::<u32>()];
+        let status = unsafe {
+            AudioObjectGetPropertyData(SYSTEM_OBJECT, &addr, 0, std::ptr::null(), &mut size, ids.as_mut_ptr() as *mut c_void)
+        };
+        (status == 0).then_some(ids)
+    }
+
+    /// True when any app is recording from a microphone: the usual sign of a call.
+    /// On macOS 14.2 and later this asks per process; earlier, it checks input
+    /// devices, skipping the output device Tonewell itself is playing through.
     pub fn mic_in_use() -> bool {
-        devices()
-            .into_iter()
-            .any(|id| has_input(id) && get_u32(id, RUNNING_SOMEWHERE, SCOPE_GLOBAL).map(|v| v != 0).unwrap_or(false))
+        if let Some(procs) = process_objects() {
+            return procs
+                .into_iter()
+                .any(|p| get_u32(p, PROCESS_RUNNING_INPUT, SCOPE_GLOBAL).map(|v| v != 0).unwrap_or(false));
+        }
+        let out = default_output();
+        devices().into_iter().any(|id| {
+            Some(id) != out && has_input(id) && get_u32(id, RUNNING_SOMEWHERE, SCOPE_GLOBAL).map(|v| v != 0).unwrap_or(false)
+        })
     }
 
     pub fn info(id: u32) -> OutputInfo {
         OutputInfo { name: name(id), kind: kind(id).into(), muted: muted(id) }
+    }
+}
+
+/// Whether any app is recording from a microphone right now.
+pub fn mic_in_use() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        mac::mic_in_use()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        false
     }
 }
 

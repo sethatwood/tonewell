@@ -76,6 +76,7 @@ export class Well {
     };
     this.el.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
+      this.suppressClick = false;
       const { cx, cy } = center();
       start = { x: e.clientX, y: e.clientY, angle: Math.atan2(e.clientY - cy, e.clientX - cx), acc: 0 };
       this.el.setPointerCapture(e.pointerId);

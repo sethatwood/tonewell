@@ -175,6 +175,11 @@ fn set_dock_visible(app: AppHandle, visible: bool) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn mic_in_use() -> bool {
+    output::mic_in_use()
+}
+
+#[tauri::command]
 fn audio_output() -> Option<output::OutputInfo> {
     output::current()
 }
@@ -208,6 +213,58 @@ static QUITTING: AtomicBool = AtomicBool::new(false);
 fn quit_now(app: AppHandle) {
     QUITTING.store(true, Ordering::SeqCst);
     app.exit(0);
+}
+
+/// The app menu. Its Quit goes through the fade-out like the menu-bar Quit; the
+/// default menu's Quit would end the process at once, mid-sound.
+fn app_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
+    let about = PredefinedMenuItem::about(app, Some("About Tonewell"), None)?;
+    let settings = MenuItem::with_id(app, "app:settings", "Settings…", true, Some("CmdOrCtrl+,"))?;
+    let quit = MenuItem::with_id(app, "app:quit", "Quit Tonewell", true, Some("CmdOrCtrl+Q"))?;
+    let sep = || PredefinedMenuItem::separator(app);
+    let tonewell = Submenu::with_items(
+        app,
+        "Tonewell",
+        true,
+        &[
+            &about,
+            &sep()?,
+            &settings,
+            &sep()?,
+            &PredefinedMenuItem::hide(app, None)?,
+            &PredefinedMenuItem::hide_others(app, None)?,
+            &PredefinedMenuItem::show_all(app, None)?,
+            &sep()?,
+            &quit,
+        ],
+    )?;
+    let edit = Submenu::with_items(
+        app,
+        "Edit",
+        true,
+        &[
+            &PredefinedMenuItem::undo(app, None)?,
+            &PredefinedMenuItem::redo(app, None)?,
+            &sep()?,
+            &PredefinedMenuItem::cut(app, None)?,
+            &PredefinedMenuItem::copy(app, None)?,
+            &PredefinedMenuItem::paste(app, None)?,
+            &PredefinedMenuItem::select_all(app, None)?,
+        ],
+    )?;
+    let close = MenuItem::with_id(app, "app:close", "Close Window", true, Some("CmdOrCtrl+W"))?;
+    let window = Submenu::with_items(app, "Window", true, &[&close, &PredefinedMenuItem::minimize(app, None)?])?;
+    Menu::with_items(app, &[&tonewell, &edit, &window])
+}
+
+/// Close the focused window. The mini player only hides: the sound keeps going.
+fn close_focused(app: &AppHandle) {
+    for (label, w) in app.webview_windows() {
+        if w.is_focused().unwrap_or(false) {
+            let _ = if label == "main" { w.hide() } else { w.close() };
+            return;
+        }
+    }
 }
 
 fn show_main(app: &AppHandle) {
@@ -248,9 +305,21 @@ pub fn run() {
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_opener::init())
         .manage(Awake::default())
-        .invoke_handler(tauri::generate_handler![tray_update, set_keep_awake, audio_output, media_state, resize_player, set_dock_visible, quit_now, debug_flags, debug_log])
+        .invoke_handler(tauri::generate_handler![tray_update, set_keep_awake, audio_output, mic_in_use, media_state, resize_player, set_dock_visible, quit_now, debug_flags, debug_log])
         .setup(|app| {
             let handle = app.handle().clone();
+            #[cfg(target_os = "macos")]
+            {
+                app.set_menu(app_menu(&handle)?)?;
+                app.on_menu_event(|app, event| match event.id().as_ref() {
+                    "app:quit" => request_quit(app),
+                    "app:close" => close_focused(app),
+                    "app:settings" => {
+                        let _ = app.emit_to("main", "remote-action", "settings".to_string());
+                    }
+                    _ => {}
+                });
+            }
             let start = build_menu(
                 &handle,
                 &[
