@@ -56,8 +56,10 @@ section.band { padding: 88px 0; border-top: 1px solid var(--line); }
 .download p { margin: 0; color: var(--ink-2); font-size: 15px; }
 footer { border-top: 1px solid var(--line); padding: 32px 0 48px; font-size: 13px; color: var(--ink-3); display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
 footer a { color: var(--ink-2); text-decoration: none; }
+.split--even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 @media (max-width: 900px) {
-  .hero, .split, .two { grid-template-columns: 1fr; }
+  .hero, .split, .split--even, .two { grid-template-columns: 1fr; }
+  .hero p .ph { display: inline; }
   .waters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .principles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hero__art { height: 360px; }
@@ -69,8 +71,19 @@ footer a { color: var(--ink-2); text-decoration: none; }
   .card { padding: 20px; }
   .principles, .waters { grid-template-columns: 1fr; }
 }
+@media (max-width: 380px) {
+  .hero__art .player, .card .player, .split > .player { zoom: 0.76; }
+  .card { padding: 14px; }
+}
+@media (max-width: 340px) {
+  .hero__art .player, .card .player, .split > .player { zoom: 0.66; }
+}
 
-/* Hear a taste: the button swaps play for stop without changing width, and the hero light breathes only while it plays. */
+/* Headings break between phrases (.ph), never inside one unless the phrase alone is too wide. */
+.ph { display: inline-block; }
+p, li { text-wrap: pretty; }
+
+/* Hear a taste:the button swaps play for stop without changing width, and the hero light breathes only while it plays. */
 [data-taste] { min-width: 10em; justify-content: center; }
 .taste__stop { display: none; }
 [data-taste][data-playing="true"] .taste__play { display: none; }

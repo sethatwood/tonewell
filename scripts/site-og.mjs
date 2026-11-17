@@ -37,7 +37,7 @@ const card = `<!doctype html>
 </head>
 <body class="tw">
 <div class="rings" aria-hidden="true">${rings}</div>
-<div class="center"><img src="/assets/tonewell-lockup.svg" alt=""><p>A quiet pool of sound for meditation and deep focus.</p></div>
+<div class="center"><img src="/assets/tonewell-lockup.svg" alt=""><p>Endless, generated sound for meditation and deep focus.</p></div>
 </body>
 </html>`;
 
