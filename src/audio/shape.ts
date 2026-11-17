@@ -98,6 +98,7 @@ export function shapeParams(p: SoundParams, o: ShapeOptions): SoundParams {
     e.bellsOn = 0;
     e.shimmerOn = 0;
     e.shepardOn = 0;
+    e.voicesOn = 0;
     e.breathLevel *= 0.35;
     e.noiseLevel *= 0.5;
     e.rainLevel *= 0.5;

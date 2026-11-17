@@ -71,6 +71,13 @@ export const BUILTIN_PRESETS: readonly Preset[] = [
     params: { droneOn: 0, breathLevel: 0.45, bellsLevel: 1, bellsDensity: 18, bellsDecay: 7, echoFeedback: 0.5, beatOn: 0, shimmerOn: 1, shimmerLevel: 0.5 },
   },
   {
+    id: 'journey',
+    name: 'Journey',
+    mode: 'meditate',
+    blurb: 'A wordless choir drifting over the drone in a vast room, with shimmer and far-off bells. Made for the visuals.',
+    params: { voicesOn: 1, voicesLevel: 0.55, voicesDensity: 4, voicesRegister: 0.4, shimmerOn: 1, shimmerLevel: 0.3, bellsDensity: 6, bellsLevel: 0.4, beatOn: 0, reverbSize: 3, walkEvery: 70, breathLevel: 0.35, droneLevel: 0.55 },
+  },
+  {
     id: 'brown-noise-desk',
     name: 'Brown Noise Desk',
     mode: 'focus',

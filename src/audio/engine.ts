@@ -17,6 +17,7 @@ import { Breath } from './layers/breath';
 import { Bells } from './layers/bells';
 import { Reverb, Width } from './layers/space';
 import { Textures } from './layers/textures';
+import { Voices } from './layers/voices';
 
 export type { Plan } from './layers/beat';
 
@@ -85,6 +86,7 @@ export class WebAudioEngine implements AudioEngine {
   private beat!: Beat;
   private breath!: Breath;
   private bells!: Bells;
+  private voices!: Voices;
   private textures: Textures | null = null;
   private reverb!: Reverb;
   private width!: Width;
@@ -172,6 +174,7 @@ export class WebAudioEngine implements AudioEngine {
     this.drone = new Drone(ctx, dry, this.reverb.input);
     this.breath = new Breath(ctx, dry, this.reverb.input, this.seed + 1);
     this.bells = new Bells(ctx, dry, this.reverb.input, this.random);
+    this.voices = new Voices(ctx, dry, this.reverb.input, this.random, this.seed + 3);
     // Beats bypass width and reverb: binaural must stay hard left/right.
     this.beat = new Beat(ctx, this.fadeGain);
     if (worklet) {
@@ -186,6 +189,7 @@ export class WebAudioEngine implements AudioEngine {
     this.drone.start(start);
     this.breath.start(start);
     this.beat.start(start);
+    this.voices.start(start);
 
     this.p = { ...params };
     this.e = shapeParams(this.p, { t: 0, seed: this.seed, landing: false });
@@ -239,6 +243,7 @@ export class WebAudioEngine implements AudioEngine {
     this.beat.apply(e, now, tau, this.s);
     this.breath.apply(e, now, tau, this.s);
     this.bells.apply(e, now, tau, this.s);
+    this.voices.apply(e, now, tau, this.s);
     this.textures?.apply(e, now, tau, this.s, this.drone.rootAt(now));
     this.reverb.apply(e, now, tau, this.s);
     this.width.apply(e, now, tau, this.s);
@@ -401,6 +406,7 @@ export class WebAudioEngine implements AudioEngine {
       if (e && e.shimmerOn && this.shimmerNext >= now) this.bells.shimmer(this.shimmerNext, this.drone.rootAt(this.shimmerNext));
       this.shimmerNext += SHIMMER_GAP * (0.5 + this.random());
     }
+    if (e) this.voices.pump(now, horizon, (t) => this.drone.rootAt(t));
     while (this.walkNext < horizon) {
       if (e && e.walkOn && this.walkNext >= now) this.drone.walkStep(e, this.walkNext);
       this.walkNext += this.walkGap();
@@ -413,6 +419,7 @@ export class WebAudioEngine implements AudioEngine {
       this.beat.tick(now);
       this.breath.tick(now);
       this.bells.tick(now);
+      this.voices.tick(now);
       this.textures?.tick(now);
       this.reverb.tick(now);
     }

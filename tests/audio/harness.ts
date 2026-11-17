@@ -141,6 +141,7 @@ function brightness(x: Float32Array, sr: number, split = 600): number {
 }
 
 const SILENT: Partial<SoundParams> = {
+  voicesOn: 0,
   droneOn: 0, breathOn: 0, bellsOn: 0, beatOn: 0, noiseOn: 0, rainOn: 0, oceanOn: 0, windOn: 0,
   shimmerOn: 0, shepardOn: 0, reverbMix: 0, driftAmount: 0, carrierTuned: 0,
 };
@@ -296,6 +297,7 @@ async function texturesCheck(out: Result[]): Promise<void> {
     ['wind', { windOn: 1 }],
     ['endless rise', { shepardOn: 1, shepardLevel: 1 }],
     ['shimmer', { shimmerOn: 1, shimmerLevel: 1 }],
+    ['voices', { voicesOn: 1, voicesLevel: 0.5, reverbMix: 0.5 }],
   ];
   for (const [name, p] of tex) {
     const buf = await renderOffline(solo(p), { seconds: 16, sampleRate: sr, workletUrl, fadeIn: 0.5 });

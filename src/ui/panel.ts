@@ -19,6 +19,7 @@ const LAYERS: Layer[] = [
   { key: 'drone', label: 'Drone', on: 'droneOn', level: 'droneLevel', detail: ['voicing', 'root', 'justTuning', 'a432', 'cutoff', 'resonance', 'sweepPeriod', 'sweepDepth', 'edge', 'detune', 'droneWidth', 'sub', 'walkOn', 'walkPattern', 'walkEvery', 'glide'] },
   { key: 'breath', label: 'Breath', on: 'breathOn', level: 'breathLevel', detail: ['breathCenter', 'breathPeriod', 'breathDepth', 'breathQ'] },
   { key: 'bells', label: 'Bells', on: 'bellsOn', level: 'bellsLevel', detail: ['bellsDensity', 'bellsScale', 'bellsRegister', 'bellsDecay', 'bellsSpread', 'echoTime', 'echoFeedback'] },
+  { key: 'voices', label: 'Voices', on: 'voicesOn', level: 'voicesLevel', detail: ['voicesDensity', 'voicesRegister', 'voicesMorph', 'voicesBreath', 'voicesSpace'] },
   { key: 'shimmer', label: 'Shimmer', on: 'shimmerOn', level: 'shimmerLevel', detail: [] },
   { key: 'noise', label: 'Noise bed', on: 'noiseOn', level: 'noiseLevel', detail: ['noiseColor', 'noiseTone'] },
   { key: 'rain', label: 'Rain', on: 'rainOn', level: 'rainLevel', detail: ['rainDensity'] },

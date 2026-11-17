@@ -4,7 +4,7 @@
 
 import { BELL_SCALES, VOICINGS, WALKS, bandName, noteName } from './tuning';
 
-export type Group = 'drone' | 'beat' | 'breath' | 'bells' | 'textures' | 'space' | 'drift' | 'macro';
+export type Group = 'drone' | 'beat' | 'breath' | 'bells' | 'voices' | 'textures' | 'space' | 'drift' | 'macro';
 
 export interface ParamDef {
   label: string;
@@ -102,6 +102,15 @@ export const PARAMS = {
   bellsSpread: range('bells', 'Spread', 0, 1, 0.8, 0.01),
   echoTime: range('bells', 'Echo time', 0.1, 1.5, 0.48, 0.01, { format: (v) => `${v.toFixed(2)} s` }),
   echoFeedback: range('bells', 'Echo repeats', 0, 0.75, 0.45, 0.01),
+
+  // Voices: a wordless synthesized choir
+  voicesOn: toggle('voices', 'Voices', 0, 'A wordless choir. It never forms words, so it won’t compete with a mantra.'),
+  voicesLevel: range('voices', 'Level', 0, 1, 0.5, 0.01),
+  voicesDensity: range('voices', 'How many', 1, 5, 3, 1, { format: (v) => `${v} ${v === 1 ? 'voice' : 'voices'}` }),
+  voicesRegister: range('voices', 'Register', 0, 1, 0.35, 0.01, { format: (v) => (v < 0.25 ? 'low' : v < 0.6 ? 'middle' : 'high') }),
+  voicesMorph: range('voices', 'Vowel drift', 4, 40, 14, 1, { format: (v) => `${v} s` }),
+  voicesBreath: range('voices', 'Breathiness', 0, 1, 0.3, 0.01),
+  voicesSpace: range('voices', 'Distance', 0, 1, 0.7, 0.01),
 
   // Textures
   noiseOn: toggle('textures', 'Noise bed', 0),
