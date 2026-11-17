@@ -42,10 +42,13 @@ hours of unobtrusive sound alongside your other apps.
 - **Honest about binaural beats.** The Learn window explains what they
   are, what the research does and doesn't show, and where folklore like
   432 Hz comes from, with sources you can check.
-- **Optional visuals.** Ten slow scenes in their own window, a breath
-  pacer, brightness that never changes faster than three times a second,
-  and a Calm mode on by default. With no visuals window open, nothing
-  renders.
+- **Optional visuals.** Fifteen slow scenes in their own window, six
+  palettes, a breath pacer, brightness that never changes faster than
+  three times a second, and a Calm mode on by default. With no visuals
+  window open, nothing renders.
+- **Kind to work.** Focus presets are steady and barely use the CPU (about
+  1% of one core for Brown Noise Desk). Turn on "Soften during calls" and
+  the sound dips whenever an app is using a microphone.
 - **Private by construction.** No accounts, no network, no analytics.
   Settings, presets and an optional session log (date, length, preset; no
   streaks) stay in one file on your Mac.
@@ -57,7 +60,7 @@ hours of unobtrusive sound alongside your other apps.
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/visuals.jpg" width="820" alt="The Tunnel, one of the visuals scenes: soft rings receding into a dark centre">
+  <img src="docs/screenshots/scenes.jpg" width="820" alt="The fifteen visuals scenes, from Chrysanthemum and The Tunnel to Metatron, the Harmonograph, a Poincaré disk and Ember">
 </p>
 
 <p align="center">
