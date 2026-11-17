@@ -438,13 +438,32 @@ export class WebAudioEngine implements AudioEngine {
     return { rms: Math.sqrt(sum / this.timeBuf.length), low: low / 6 / 255, high: high / 140 / 255 };
   }
 
+  /**
+   * Stop everything and detach from the output. After this the engine makes
+   * no sound and costs nothing, even if the context resumes later for a new
+   * session: an old graph left connected would come back at whatever level
+   * it was playing.
+   */
   dispose(): void {
+    if (this.disposed) return;
     this.disposed = true;
     if (this.interval) clearInterval(this.interval);
     this.interval = null;
     if (this.clock) {
       this.clock.port.onmessage = null;
+      this.clock.port.postMessage('stop');
       this.clock.disconnect();
     }
+    try {
+      this.analyser.disconnect();
+    } catch {
+      // Already disconnected.
+    }
+    const at = this.ctx.currentTime;
+    this.drone.stop(at);
+    this.breath.stop(at);
+    this.beat.stop(at);
+    this.voices.stop(at);
+    this.textures?.stop();
   }
 }

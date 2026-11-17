@@ -105,6 +105,16 @@ export class Beat {
     this.pulse.start(at);
   }
 
+  stop(at: number): void {
+    for (const n of [this.oscL, this.oscR, this.oscC, this.pulse]) {
+      try {
+        n.stop(at);
+      } catch {
+        // Already stopped.
+      }
+    }
+  }
+
   /** The beat frequency at audio time t (for display). */
   hzAt(t: number): number {
     return evalPlan(this.hzPlan, t);

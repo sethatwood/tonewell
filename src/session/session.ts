@@ -190,6 +190,8 @@ export class Session extends EventTarget {
     this.current.presetId = preset.id;
     this.current.params = presetParams(preset);
     this.engine?.setParams(this.engineParams(), CROSSFADE_TAU);
+    // The new preset may glide differently (or not at all): follow its plan from here.
+    if (this.isRunning()) this.applyBeatPlan(4);
     this.afterParamChange();
   }
 

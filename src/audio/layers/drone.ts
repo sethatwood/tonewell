@@ -94,6 +94,12 @@ export class Drone {
     this.autopanLfo.start(at);
   }
 
+  stop(at: number): void {
+    const nodes: AudioScheduledSourceNode[] = [this.sub, this.sweep, this.autopanLfo];
+    for (const v of this.voices) nodes.push(v.saw, v.tri);
+    stopAll(nodes, at);
+  }
+
   baseRootHz(e: SoundParams): number {
     return midiToHz(e.root, e.a432 ? 432 : 440);
   }
@@ -183,5 +189,15 @@ export class Drone {
   tick(now: number): void {
     this.gate.tick(now);
     this.subGate.tick(now);
+  }
+}
+
+function stopAll(nodes: AudioScheduledSourceNode[], at: number): void {
+  for (const n of nodes) {
+    try {
+      n.stop(at);
+    } catch {
+      // Never started, or already stopped.
+    }
   }
 }

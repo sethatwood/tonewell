@@ -286,6 +286,26 @@ async function endCheck(out: Result[]): Promise<void> {
   });
 }
 
+async function disposeCheck(out: Result[]): Promise<void> {
+  // A finished session's engine must never sound again, even if the context keeps running.
+  const sr = 48000;
+  const deep = BUILTIN_PRESETS.find((p) => p.id === 'deep-theta')!;
+  const buf = await renderOffline(presetParams(deep), {
+    seconds: 10, sampleRate: sr, workletUrl, fadeIn: 0.5,
+    script: (engine, t) => {
+      if (t === 5) engine.dispose();
+    },
+  });
+  const m = mix(buf);
+  const before = dB(rms(slice(m, sr, 3, 5)));
+  const after = peak(slice(m, sr, 5.05, 10));
+  out.push({
+    name: 'dispose: an ended engine is silent at once and stays silent',
+    pass: before > -40 && after === 0,
+    detail: { beforeDb: before.toFixed(1), peakAfter: after.toExponential(2) },
+  });
+}
+
 async function texturesCheck(out: Result[]): Promise<void> {
   const sr = 48000;
   const tex: Array<[string, Partial<SoundParams>]> = [
@@ -330,7 +350,7 @@ async function longRunCheck(out: Result[]): Promise<void> {
 async function run(): Promise<Result[]> {
   const out: Result[] = [];
   const status = document.getElementById('status')!;
-  const steps = [presetChecks, binauralCheck, rampCheck, monauralCheck, landingCheck, volumeCheck, endCheck, texturesCheck, longRunCheck];
+  const steps = [presetChecks, binauralCheck, rampCheck, monauralCheck, landingCheck, volumeCheck, endCheck, disposeCheck, texturesCheck, longRunCheck];
   for (const step of steps) {
     status.textContent = `Running ${step.name}…`;
     try {

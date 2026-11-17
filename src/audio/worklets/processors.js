@@ -118,6 +118,10 @@ class Textures extends AudioWorkletProcessor {
     this.wind = [0, 1].map(() => ({ low: 0, band: 0, fc: 400, target: 400, gust: 0.5, gustTarget: 0.6, timer: 0 }));
     this.shepPhase = 0;
     this.shepTheta = new Float64Array(9);
+    this.alive = true;
+    this.port.onmessage = (e) => {
+      if (e.data === 'stop') this.alive = false;
+    };
   }
 
   process(_inputs, outputs, p) {
@@ -235,7 +239,7 @@ class Textures extends AudioWorkletProcessor {
         for (let ch = 0; ch < out.length; ch++) out[ch][i] = s;
       }
     }
-    return true;
+    return this.alive;
   }
 }
 
@@ -243,13 +247,17 @@ class Clock extends AudioWorkletProcessor {
   constructor() {
     super();
     this.blocks = 0;
+    this.alive = true;
+    this.port.onmessage = (e) => {
+      if (e.data === 'stop') this.alive = false;
+    };
   }
   process() {
     if (++this.blocks >= 48) {
       this.blocks = 0;
       this.port.postMessage(currentTime);
     }
-    return true;
+    return this.alive;
   }
 }
 

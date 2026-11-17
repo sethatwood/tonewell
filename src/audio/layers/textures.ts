@@ -83,6 +83,12 @@ export class Textures {
     s.set(this.noiseTone.frequency, e.noiseTone, now, tau);
   }
 
+  /** Let the generator finish so it can be garbage-collected. */
+  stop(): void {
+    this.node.port.postMessage('stop');
+    this.node.disconnect();
+  }
+
   tick(now: number): void {
     for (const k of KEYS) {
       const wasAwake = this.gates[k].awake;

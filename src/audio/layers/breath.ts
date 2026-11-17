@@ -59,6 +59,16 @@ export class Breath {
     this.lfo.start(at);
   }
 
+  stop(at: number): void {
+    for (const n of [this.src, this.lfo]) {
+      try {
+        n.stop(at);
+      } catch {
+        // Already stopped.
+      }
+    }
+  }
+
   apply(e: SoundParams, now: number, tau: number, s: Smoother): void {
     s.set(this.band.frequency, e.breathCenter, now, tau);
     s.set(this.band.Q, e.breathQ, now, tau);

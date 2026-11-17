@@ -112,6 +112,18 @@ export class Voices {
     });
   }
 
+  stop(at: number): void {
+    const nodes: AudioScheduledSourceNode[] = [this.noise];
+    for (const v of this.voices) nodes.push(v.osc, v.vibrato);
+    for (const n of nodes) {
+      try {
+        n.stop(at);
+      } catch {
+        // Already stopped.
+      }
+    }
+  }
+
   apply(e: SoundParams, now: number, tau: number, s: Smoother): void {
     this.e = e;
     this.level = e.voicesOn ? e.voicesLevel : 0;

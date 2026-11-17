@@ -24,6 +24,11 @@ const HEIGHT = { mini: 184, folded: 128, expanded: 744 };
 // ---------- small dialog for naming presets ----------
 
 function ask(question: string, initial: string): Promise<string | null> {
+  // Asked from the menu bar, the window may be hidden: bring it forward first.
+  void currentWindow().then(async (w) => {
+    await w?.show();
+    await w?.setFocus();
+  });
   return new Promise((resolve) => {
     const input = h('input', { type: 'text', value: initial, id: 'ask-input', autocomplete: 'off', spellcheck: 'false' });
     const cancel = h('button', { type: 'button', class: 'btn quiet' }, 'Cancel');
