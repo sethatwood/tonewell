@@ -2,14 +2,16 @@
 // renders anything continuously. Closing it stops all rendering; the sound
 // lives in the mini player and is never affected.
 //
-// Photosensitivity rules, enforced here:
+// Photosensitivity rules:
 // - every input that changes brightness is smoothed (time constants ≥ 1 s)
-//   and slew-limited, so overall brightness can't swing faster than 3 Hz;
+//   and slew-limited in renderer.ts, so overall brightness can't swing
+//   faster than 3 Hz;
 // - a global brightness cap, lower again in Calm visuals;
 // - no beat-synced pulsing: the beat frequency is never fed to the picture;
 // - Esc fades to dark at once (over about a second, never a cut).
 
-import { EMBER, PALETTES, SCENES, FRAG, VERT } from './shader';
+import { EMBER, PALETTES, SCENES } from './shader';
+import { Visuals } from './renderer';
 import { emitTo, listen, currentWindow, isTauri } from '../platform/bridge';
 import { loadSettings, patchSettings, type AppSettings } from '../settings/model';
 import { h } from '../ui/controls';
@@ -63,110 +65,32 @@ document.body.append(canvas);
 const darkHint = h('p', { class: 'dark-hint' }, 'Dark. Press any key for light, or Esc again to close.');
 document.body.append(darkHint);
 
-const gl2 = canvas.getContext('webgl2', { antialias: false, powerPreference: 'low-power' });
-const gl = (gl2 ?? canvas.getContext('webgl', { antialias: false, powerPreference: 'low-power' })) as WebGLRenderingContext | null;
-const U: Record<string, WebGLUniformLocation | null> = {};
-
-function compile(type: number, src: string): WebGLShader {
-  const s = gl!.createShader(type)!;
-  gl!.shaderSource(s, src);
-  gl!.compileShader(s);
-  if (!gl!.getShaderParameter(s, gl!.COMPILE_STATUS)) console.error(gl!.getShaderInfoLog(s));
-  return s;
-}
-
-if (gl) {
-  const prog = gl.createProgram()!;
-  gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT));
-  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FRAG));
-  gl.linkProgram(prog);
-  gl.useProgram(prog);
-  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(0);
-  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-  for (const n of ['R', 'T', 'mixv', 'sa', 'sb', 'bass', 'hi', 'fade', 'bright', 'sat', 'pacer', 'pacerPhase', 'palMix', 'palOrig0', 'palOrig1', 'ratioA', 'ratioB', 'pa0', 'pb0', 'pc0', 'pd0', 'pa1', 'pb1', 'pc1', 'pd1']) U[n] = gl.getUniformLocation(prog, n);
-}
-
-let quality = 0.7;
-function resize(): void {
-  const d = Math.min(devicePixelRatio || 1, 2) * quality;
-  canvas.width = Math.max(2, Math.round(innerWidth * d));
-  canvas.height = Math.max(2, Math.round(innerHeight * d));
-  gl?.viewport(0, 0, canvas.width, canvas.height);
-}
-addEventListener('resize', resize);
-resize();
+const vis = Visuals.create(canvas);
+addEventListener('resize', () => vis?.resize());
 
 let settings: AppSettings;
 const state = {
-  T: Math.random() * 200,
   flow: 1,
   glow: 0.85,
-  scene: 0,
-  next: 0,
-  mixv: 0,
-  mixing: false,
-  drift: true,
-  since: 0,
   dark: false,
   pacer: false,
-  breathsPerMinute: 5.5,
-  pacerPhase: 0,
-  palette: 0,
-  nextPalette: 0,
-  palMix: 0,
-  /** A scene asked for while a cross-fade is running; it starts when the fade ends. */
-  queued: null as number | null,
 };
-// Smoothed values actually sent to the shader.
-const live = { fade: 0, bright: 0, sat: 1.6, bass: 0, hi: 0, flow: 1, pacer: 0 };
 let frame: Frame = { rms: 0, low: 0, high: 0, phase: 'ready', mode: 'meditate', landing: true };
 let lastFrameAt = 0;
 
-/** Move `v` toward `target` with time constant `tau`, never faster than `maxRate` per second. */
-function approach(v: number, target: number, dt: number, tau: number, maxRate: number): number {
-  const step = (target - v) * Math.min(1, dt / tau);
-  const cap = maxRate * dt;
-  return v + Math.max(-cap, Math.min(cap, step));
-}
-
 const nameEl = h('span', { class: 'name', 'aria-live': 'polite' });
-/** The scene the picture is heading to: queued, else cross-fading to, else showing. */
-function target(): number {
-  return state.queued ?? (state.mixing ? state.next : state.scene);
-}
 function setName(): void {
-  nameEl.textContent = SCENES[target()];
+  if (vis) nameEl.textContent = SCENES[vis.target()];
 }
-/**
- * Move to scene k. A change never interrupts a cross-fade (that would be a hard
- * cut, and repeated presses could flash): it waits, and only the latest request
- * is kept.
- */
+if (vis) vis.onScene = setName;
 function goTo(k: number): void {
-  const n = SCENES.length;
-  k = ((k % n) + n) % n;
-  if (state.mixing) {
-    state.queued = k === state.next ? null : k;
-    setName();
-    return;
-  }
-  state.queued = null;
-  if (k === state.scene) {
-    setName();
-    return;
-  }
-  state.next = k;
-  state.mixing = true;
-  state.mixv = 0;
-  state.since = 0;
-  setName();
+  vis?.goTo(k);
+}
+function target(): number {
+  return vis?.target() ?? 0;
 }
 
 let last = performance.now();
-let acc = 0;
-let frames = 0;
 function draw(now: number): void {
   const dt = Math.min((now - last) / 1000, 0.1);
   last = now;
@@ -175,104 +99,28 @@ function draw(now: number): void {
   const react = (settings?.audioReactivity ?? 0.4) * (calm ? 0.5 : 1);
   const stale = performance.now() - lastFrameAt > 2000;
   const landing = stale ? false : frame.landing && frame.phase !== 'ready';
-
-  // Targets: soft landing and Calm visuals dim, slow and desaturate.
-  const fadeTarget = state.dark ? 0 : landing ? 0.28 : frame.phase === 'ready' && !stale ? 0.45 : 1;
-  const flowTarget = state.flow * (landing ? 0.35 : 1) * (calm ? 0.6 : 1);
-  const satTarget = landing ? 0.5 : calm ? 1.15 : 1.6;
-  // Fades are slow, except Esc which goes dark in about a second.
-  live.fade = approach(live.fade, fadeTarget, dt, state.dark ? 0.25 : 2, state.dark ? 1.2 : 0.35);
-  live.bright = approach(live.bright, state.glow * cap, dt, 1, 0.3);
-  live.sat = approach(live.sat, satTarget, dt, 2, 0.4);
-  live.flow = approach(live.flow, flowTarget, dt, 2, 0.6);
-  // Audio reactivity: heavily smoothed (τ ≈ 1.5 s), scaled by the user's amount.
-  live.bass = approach(live.bass, frame.low * react, dt, 1.5, 0.25);
-  live.hi = approach(live.hi, frame.high * react, dt, 1.5, 0.25);
-
-  state.T += dt * live.flow;
-  if (state.mixing) {
-    state.mixv += dt / 9;
-    if (state.mixv >= 1) {
-      state.scene = state.next;
-      state.mixv = 0;
-      state.mixing = false;
-      if (state.queued !== null) {
-        const q = state.queued;
-        state.queued = null;
-        goTo(q);
-      }
-    }
-  }
-  // Drift moves through the scenes in turn; Ember stays put once chosen.
-  if (state.drift && !state.mixing && state.scene !== EMBER && (state.since += dt) > 80) goTo((state.scene + 1) % EMBER);
-  live.pacer = approach(live.pacer, state.pacer ? 1 : 0, dt, 1.5, 0.5);
-  if (state.nextPalette !== state.palette) {
-    state.palMix = Math.min(1, state.palMix + dt / 4);
-    if (state.palMix >= 1) {
-      state.palette = state.nextPalette;
-      state.palMix = 0;
-    }
-  }
-  state.pacerPhase = (state.pacerPhase + (dt * state.breathsPerMinute) / 60) % 1;
-
-  // Adapt resolution to keep frame time comfortable.
-  acc += dt;
-  frames++;
-  if (acc > 2) {
-    const avg = acc / frames;
-    if (avg > 0.026 && quality > 0.4) {
-      quality -= 0.1;
-      resize();
-    } else if (avg < 0.012 && quality < 1) {
-      quality += 0.05;
-      resize();
-    }
-    acc = 0;
-    frames = 0;
-  }
-
-  if (gl) {
-    gl.uniform2f(U.R, canvas.width, canvas.height);
-    gl.uniform1f(U.T, state.T);
-    gl.uniform1f(U.mixv, state.mixv);
-    gl.uniform1f(U.sa, state.scene);
-    gl.uniform1f(U.sb, state.next);
-    gl.uniform1f(U.bass, live.bass);
-    gl.uniform1f(U.hi, live.hi);
-    gl.uniform1f(U.fade, live.fade);
-    gl.uniform1f(U.bright, live.bright);
-    gl.uniform1f(U.sat, live.sat);
-    gl.uniform1f(U.pacer, live.pacer);
-    setPalette(0, state.palette);
-    setPalette(1, state.nextPalette);
-    gl.uniform1f(U.palMix, state.palMix);
-    gl.uniform1f(U.ratioA, frame.ratio?.[0] ?? 3);
-    gl.uniform1f(U.ratioB, frame.ratio?.[1] ?? 2);
-    gl.uniform1f(U.pacerPhase, state.pacerPhase);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-  }
+  // Soft landing and Calm visuals dim, slow and desaturate.
+  vis?.step(dt, {
+    fade: state.dark ? 0 : landing ? 0.28 : frame.phase === 'ready' && !stale ? 0.45 : 1,
+    dark: state.dark,
+    bright: state.glow * cap,
+    sat: landing ? 0.5 : calm ? 1.15 : 1.6,
+    flow: state.flow * (landing ? 0.35 : 1) * (calm ? 0.6 : 1),
+    bass: frame.low * react,
+    hi: frame.high * react,
+    pacer: state.pacer,
+    ratio: frame.ratio,
+  });
   requestAnimationFrame(draw);
-}
-
-function setPalette(slot: 0 | 1, index: number): void {
-  if (!gl) return;
-  const p = PALETTES[index] ?? PALETTES[0];
-  gl.uniform1f(U[`palOrig${slot}`], p.abcd ? 0 : 1);
-  const v = p.abcd ?? [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1, 1, 1, 0, 0.33, 0.67];
-  gl.uniform3f(U[`pa${slot}`], v[0], v[1], v[2]);
-  gl.uniform3f(U[`pb${slot}`], v[3], v[4], v[5]);
-  gl.uniform3f(U[`pc${slot}`], v[6], v[7], v[8]);
-  gl.uniform3f(U[`pd${slot}`], v[9], v[10], v[11]);
 }
 
 /** Choose the next palette; the change cross-fades over about four seconds. */
 function cyclePalette(): void {
-  if (state.nextPalette !== state.palette) return;
-  state.nextPalette = (state.palette + 1) % PALETTES.length;
-  state.palMix = 0;
-  paletteBtn?.replaceChildren(PALETTES[state.nextPalette].name);
-  settings.visualsPalette = state.nextPalette;
-  void patchSettings({ visualsPalette: state.nextPalette });
+  const next = vis?.cyclePalette();
+  if (next == null) return;
+  paletteBtn?.replaceChildren(PALETTES[next].name);
+  settings.visualsPalette = next;
+  void patchSettings({ visualsPalette: next });
 }
 
 // ---------- controls ----------
@@ -307,9 +155,10 @@ function buildBar(): HTMLElement {
   next.addEventListener('click', () => goTo(target() + 1));
   const drift = h('button', { class: 'btn', 'aria-pressed': 'true' }, 'Drift');
   drift.addEventListener('click', () => {
-    state.drift = !state.drift;
-    state.since = 0;
-    drift.setAttribute('aria-pressed', String(state.drift));
+    if (!vis) return;
+    vis.drift = !vis.drift;
+    vis.since = 0;
+    drift.setAttribute('aria-pressed', String(vis.drift));
   });
   const slider = (label: string, min: number, max: number, value: number, on: (v: number) => void) => {
     const input = h('input', { type: 'range', class: 'scale', min, max, step: 0.01, value });
@@ -332,7 +181,7 @@ function buildBar(): HTMLElement {
     state.pacer = !state.pacer;
     pacerBtn!.setAttribute('aria-pressed', String(state.pacer));
   });
-  paletteBtn = h('button', { class: 'btn', title: 'Palette (P)' }, PALETTES[state.palette].name);
+  paletteBtn = h('button', { class: 'btn', title: 'Palette (P)' }, PALETTES[vis?.palette ?? 0].name);
   paletteBtn.addEventListener('click', () => cyclePalette());
   const fs = h('button', { class: 'btn' }, 'Full screen');
   fs.addEventListener('click', () => void toggleFullscreen());
@@ -414,7 +263,7 @@ canvas.addEventListener('dblclick', () => void toggleFullscreen());
 
 async function boot(): Promise<void> {
   settings = await loadSettings();
-  state.palette = state.nextPalette = Math.min(PALETTES.length - 1, Math.max(0, settings.visualsPalette ?? 0));
+  if (vis) vis.palette = vis.nextPalette = Math.min(PALETTES.length - 1, Math.max(0, settings.visualsPalette ?? 0));
   await listen<Frame>('audio-frame', (f) => {
     frame = f;
     lastFrameAt = performance.now();
@@ -433,7 +282,7 @@ async function boot(): Promise<void> {
     }
     settings = await patchSettings({ calmVisuals: settings.calmVisuals, visualsWarned: true });
   }
-  if (!gl) {
+  if (!vis) {
     document.body.append(h('p', { style: 'color:#aaa;padding:24px' }, 'This Mac could not start WebGL, so the visuals can’t run here. The sound is unaffected.'));
     return;
   }

@@ -9,6 +9,7 @@ import { check, item, popup, sep, submenu } from './ui/menu';
 import { h } from './ui/controls';
 import { currentWindow, emitTo, invoke, isTauri, isWindowOpen, listen, openWindow } from './platform/bridge';
 import { flushNow } from './platform/store';
+import { chordRatio } from './visuals/chords';
 import { GLOBAL_SHORTCUTS, loadSettings, patchSettings, type AppSettings } from './settings/model';
 
 const session = new Session();
@@ -317,9 +318,6 @@ document.addEventListener('visibilitychange', () => root.classList.toggle('windo
 
 // ---------- the visuals feed ----------
 
-/** Each drone chord as the small ratio the Harmonograph draws: fifth, octave, minor third, fourth. */
-const CHORD_RATIOS: Array<[number, number]> = [[3, 2], [2, 1], [6, 5], [4, 3]];
-
 setInterval(() => {
   if (!visualsOpen) return;
   const lv = session.levels();
@@ -329,7 +327,7 @@ setInterval(() => {
     phase: s, mode: session.mode,
     landing: s === 'winding' || s === 'resting' || s === 'ending' || s === 'ready',
     beatHz: session.beatHzNow(), rootHz: session.rootNow(),
-    ratio: CHORD_RATIOS[session.params.voicing] ?? [3, 2],
+    ratio: chordRatio(session.params.voicing),
   });
 }, 50);
 
