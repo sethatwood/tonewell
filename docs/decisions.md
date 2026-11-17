@@ -31,8 +31,18 @@ Noise Desk and about 4% for Deep Theta, the busiest Meditate preset.
 Layers that are off disconnect themselves after their fade, so they cost
 nothing; `npm run perf` reports each layer's cost.
 
-**Revisit if** a 40-minute session with the screen locked glitches or
-drifts, or long Focus sessions use noticeable CPU.
+Two longer runs in the built app, window hidden throughout:
+
+- A 20-minute Deep Theta session ran its full course: timer end on the
+  audio clock, wind down to the hum, a 2-minute rest, a 20-second fade,
+  and back to ready with the audio context suspended.
+- A 40-minute Deep Theta session with the display asleep did the same.
+  The longest gap between scheduler runs was 0.17 s across 42 minutes,
+  and CPU was flat (4.5% of one core in the first ten minutes, 4.7% in
+  the last ten).
+
+**Revisit if** a session with the screen locked (not just the display
+asleep) glitches or drifts, or a multi-hour Focus session's CPU creeps.
 
 ## 2. Musical time lives on the audio clock
 
