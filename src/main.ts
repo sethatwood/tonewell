@@ -190,6 +190,18 @@ async function runAction(action: string): Promise<void> {
       return;
     case 'next-preset':
       return session.stepPreset(1);
+    // Media keys and headphone buttons walk the same ladder as Esc.
+    case 'media-toggle':
+      if (session.phase === 'ready') return session.start();
+      session.escape();
+      return;
+    case 'media-play':
+      if (session.phase === 'ready') return session.start();
+      if (session.phase === 'resting' || session.phase === 'winding') return session.resume();
+      return;
+    case 'media-pause':
+      if (session.phase === 'playing') return session.windDown();
+      return;
     case 'visuals':
       return openVisuals();
     case 'learn':
@@ -207,8 +219,18 @@ const player = new Player(session, actions, ask);
 const panel = new Panel(session, (card) => void openLearn(card), ask);
 app.append(player.el, panel.el);
 
+let mediaKey = '';
+function updateMedia(phase: Phase, title: string): void {
+  const state = phase === 'playing' ? 'playing' : phase === 'ready' ? 'stopped' : 'paused';
+  const key = `${state}:${title}`;
+  if (key === mediaKey) return;
+  mediaKey = key;
+  void invoke('media_state', { state, title }).catch(() => undefined);
+}
+
 function render(): void {
   const s = session.snapshot();
+  updateMedia(s.phase, s.preset.name);
   root.dataset.mode = s.mode;
   root.dataset.phase = s.phase;
   root.dataset.sounding = String(s.phase !== 'ready');

@@ -2,6 +2,7 @@
 //! watching, window lifecycle and a quit that lets the sound fade first.
 //! All sound is made in the main window's webview; see src/audio.
 
+mod media;
 mod output;
 
 use std::sync::Mutex;
@@ -119,6 +120,12 @@ fn set_keep_awake(state: State<Awake>, display: bool, system: bool) -> Result<()
     Ok(())
 }
 
+/// Tell macOS whether a session is playing, for media keys and headphone buttons.
+#[tauri::command]
+fn media_state(app: AppHandle, state: String, title: String) {
+    media::set_state(&app, state, title);
+}
+
 #[tauri::command]
 fn audio_output() -> Option<output::OutputInfo> {
     output::current()
@@ -192,7 +199,7 @@ pub fn run() {
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_opener::init())
         .manage(Awake::default())
-        .invoke_handler(tauri::generate_handler![tray_update, set_keep_awake, audio_output, quit_now, debug_flags, debug_log])
+        .invoke_handler(tauri::generate_handler![tray_update, set_keep_awake, audio_output, media_state, quit_now, debug_flags, debug_log])
         .setup(|app| {
             let handle = app.handle().clone();
             let start = build_menu(
@@ -221,6 +228,8 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            media::install(&handle);
 
             let watcher = handle.clone();
             output::watch(move |change| {
