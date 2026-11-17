@@ -127,6 +127,7 @@ export class Voices {
   apply(e: SoundParams, now: number, tau: number, s: Smoother): void {
     this.e = e;
     this.level = e.voicesOn ? e.voicesLevel : 0;
+    if (this.level <= 0 && !this.gate.awake) return;
     s.set(this.send.gain, e.voicesSpace * 1.2, now, tau);
     for (const v of this.voices) s.set(v.breath.gain, 0.05 + e.voicesBreath * 0.5, now, tau);
     this.gate.set(this.level > 0 ? VOICE_GAIN : 0, now, Math.max(tau, 1), s);

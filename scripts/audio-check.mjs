@@ -10,6 +10,7 @@ await server.listen();
 const url = `${server.resolvedUrls.local[0]}tests/audio/harness.html`;
 
 const browser = await webkit.launch();
+// Sessions use a real-time AudioContext, which needs autoplay allowed in the test browser.
 let failed = 0;
 try {
   const page = await browser.newPage();
@@ -18,6 +19,8 @@ try {
   });
   page.on('pageerror', (e) => console.log(`[page error] ${e.message}`));
   await page.goto(url);
+  // Real-time audio (the session checks) needs a user gesture to start.
+  await page.click('#unlock');
   await page.waitForFunction(() => typeof window.tonewellChecks === 'function', null, { timeout: 30000 });
   const results = await page.evaluate(() => window.tonewellChecks(), null);
   for (const r of results) {

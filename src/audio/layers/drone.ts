@@ -144,6 +144,9 @@ export class Drone {
   apply(e: SoundParams, now: number, tau: number, s: Smoother): void {
     const prev = this.applied;
     const first = prev === null;
+    const level = e.droneOn ? e.droneLevel * DRONE_GAIN : 0;
+    // Off and asleep: touch nothing, so no automation piles up on a layer nobody hears.
+    if (!first && level === 0 && !this.gate.awake && !this.subGate.awake) return;
 
     if (first) {
       const hz = this.walkRootHz(e);
@@ -159,6 +162,9 @@ export class Drone {
       prev.voicing !== e.voicing || prev.walkPattern !== e.walkPattern || prev.walkOn !== e.walkOn
     ) {
       if (prev.walkPattern !== e.walkPattern || (prev.walkOn && !e.walkOn)) this.walkIndex = 0;
+      // Forget steps planned in the old key.
+      this.rootTrail = this.rootTrail.filter((p) => p.t <= now);
+      if (this.rootTrail.length === 0) this.rootTrail = [{ t: 0, hz: this.walkRootHz(prev) }];
       // Musical changes glide at the walk's own pace, never faster than 1.5 s.
       this.glideTo(this.walkRootHz(e), e, now, Math.max(1.5, e.glide * 0.6));
     }
@@ -180,7 +186,6 @@ export class Drone {
     s.set(this.autopanDepth.gain, e.autopan * 0.7, now, tau);
     s.set(this.subGain.gain, e.sub * SUB_GAIN, now, tau);
 
-    const level = e.droneOn ? e.droneLevel * DRONE_GAIN : 0;
     this.gate.set(level, now, tau, s);
     this.subGate.set(e.droneOn && e.sub > 0 ? 1 : 0, now, tau, s);
     this.applied = { ...e };

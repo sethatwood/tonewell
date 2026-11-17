@@ -66,6 +66,7 @@ export class Reverb {
 
   apply(e: SoundParams, now: number, tau: number, s: Smoother): void {
     if (e.reverbSize !== this.size) this.load(e.reverbSize, now, this.size < 0 ? 0 : 2.5);
+    if (e.reverbMix <= 0.001 && !this.gate.awake) return;
     s.set(this.mix.gain, e.reverbMix * REVERB_GAIN, now, tau);
     s.set(this.output.frequency, e.reverbTone, now, tau);
     this.gate.set(e.reverbMix > 0.001 ? 1 : 0, now, Math.max(tau, 0.5), s);

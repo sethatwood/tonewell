@@ -111,7 +111,16 @@ export class Session extends EventTarget {
   private lastEsc = 0;
   private lastWall = Date.now();
   private deviceLost: { name: string; at: number } | null = null;
-  private wasPlayingBeforeDeviceLoss = false;
+  /** Paused because the output disappeared: timers and breaks are frozen until the person resumes. */
+  private pausedForDevice = false;
+  private starting = false;
+  private lastGo = 0;
+  /** Audio time the current block started (the session start, or the end of the last Focus break). */
+  private blockStart = 0;
+  /** Audio time a manual wind-down began, so the timer can pause while resting. */
+  private windStartedAt: number | null = null;
+  private switchTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastAudio = 0;
 
   constructor() {
     super();
@@ -285,6 +294,10 @@ export class Session extends EventTarget {
   setPrefs(patch: Partial<SessionPrefs>): void {
     Object.assign(this.current.prefs, patch);
     if ('minutes' in patch && this.isRunning()) this.retime();
+    else if (this.isRunning() && ('keepPlaying' in patch || 'restMinutes' in patch || 'breakMinutes' in patch)) {
+      this.armSafetyNet();
+      this.applyBeatPlan(2);
+    }
     if ('keepScreenAwake' in patch) this.updateKeepAwake();
     this.afterParamChange();
   }
@@ -305,7 +318,10 @@ export class Session extends EventTarget {
     this.mode = mode;
     // Sound crossfades over about 8 s; a running timer is never touched.
     this.engine?.setParams(this.engineParams(), CROSSFADE_TAU);
-    if (this.isRunning()) this.applyBeatPlan(4);
+    if (this.isRunning()) {
+      this.armSafetyNet();
+      this.applyBeatPlan(4);
+    }
     this.updateKeepAwake();
     this.persist();
     this.emit();
@@ -318,6 +334,10 @@ export class Session extends EventTarget {
   }
 
   async go(): Promise<void> {
+    // A double-click must not start and then immediately wind down.
+    const t = performance.now();
+    if (t - this.lastGo < 800) return;
+    this.lastGo = t;
     switch (this.phase) {
       case 'ready':
         return this.start();
@@ -350,13 +370,26 @@ export class Session extends EventTarget {
   }
 
   async start(): Promise<void> {
-    if (this.phase !== 'ready') return;
+    if (this.phase !== 'ready' || this.starting) return;
+    this.starting = true;
+    try {
+      await this.startNow();
+    } finally {
+      this.starting = false;
+    }
+  }
+
+  private async startNow(): Promise<void> {
     this.clearPhaseTimer();
     const ctx = await this.ensureContext();
     this.engine?.dispose();
     this.engine = await WebAudioEngine.create(ctx, this.engineParams(), { workletUrl, volume: this.volume });
     const prefs = this.prefs;
     this.startAt = ctx.currentTime;
+    this.blockStart = this.startAt;
+    this.windStartedAt = null;
+    this.pausedForDevice = false;
+    this.deviceLost = null;
     this.startedWall = new Date();
     this.timerDone = false;
     this.inBreak = false;
@@ -377,7 +410,12 @@ export class Session extends EventTarget {
     this.phase = 'winding';
     if (this.prefs.landTo === 'silence' && !this.inBreak) this.engine.fade(0, WIND_SECONDS);
     else this.engine.setLanding(true, WIND_SECONDS);
-    if (!auto) this.restEndsAt = null;
+    if (!auto) {
+      // Resting by hand pauses the timer: it picks up where it left off on Resume.
+      this.restEndsAt = null;
+      this.windStartedAt = this.ctx?.currentTime ?? 0;
+      this.engine.clearEnd();
+    }
     this.emit();
     this.phaseTimer = setTimeout(() => {
       if (this.phase !== 'winding') return;
@@ -391,14 +429,27 @@ export class Session extends EventTarget {
     if (!this.engine || !(this.phase === 'winding' || this.phase === 'resting' || this.phase === 'ending')) return;
     this.clearPhaseTimer();
     await this.ensureContext();
+    if (!this.engine) return;
+    const now = this.ctx?.currentTime ?? 0;
+    this.pausedForDevice = false;
+    this.deviceLost = null;
     this.engine.setLanding(false, RESUME_SECONDS);
     this.engine.fade(1, RESUME_SECONDS);
     this.restEndsAt = null;
-    if (this.timerDone) {
+    if (this.inBreak) {
+      // Resuming during a Focus break ends the break early and starts the next block.
+      this.startBlock(now);
+    } else if (this.timerDone) {
       // Resuming after the timer: carry on, open-ended.
       this.timerDone = false;
       this.endAt = null;
       this.engine.clearEnd();
+    } else if (this.windStartedAt !== null) {
+      // The timer paused while resting by hand; move the end on by the time spent resting.
+      if (this.endAt !== null) this.endAt += Math.max(0, now - this.windStartedAt);
+      this.windStartedAt = null;
+      this.armSafetyNet();
+      this.applyBeatPlan(2);
     }
     this.phase = 'playing';
     this.setNotice(null);
@@ -422,7 +473,7 @@ export class Session extends EventTarget {
 
   /** Fade out quickly and stop, for quitting the app. */
   async quit(): Promise<void> {
-    if (this.engine && this.isRunning() && this.ctx?.state === 'running') {
+    if (this.engine && this.phase !== 'ready' && this.ctx?.state === 'running') {
       this.engine.fade(0, 1.5);
       await new Promise((r) => setTimeout(r, 1700));
     }
@@ -443,6 +494,9 @@ export class Session extends EventTarget {
     this.restEndsAt = null;
     this.startedWall = null;
     this.inBreak = false;
+    this.windStartedAt = null;
+    this.pausedForDevice = false;
+    this.deviceLost = null;
     this.updateKeepAwake();
     this.emit();
   }
@@ -450,6 +504,17 @@ export class Session extends EventTarget {
   private clearPhaseTimer(): void {
     if (this.phaseTimer) clearTimeout(this.phaseTimer);
     this.phaseTimer = null;
+    if (this.switchTimer) clearTimeout(this.switchTimer);
+    this.switchTimer = null;
+  }
+
+  /** Begin a new block now (session start, or after a Focus break). */
+  private startBlock(now: number): void {
+    this.inBreak = false;
+    this.blockStart = now;
+    this.endAt = this.prefs.minutes ? now + this.prefs.minutes * 60 : null;
+    this.armSafetyNet();
+    this.applyBeatPlan(2);
   }
 
   // ---------- timer ----------
@@ -482,7 +547,7 @@ export class Session extends EventTarget {
     if (minutes === null) {
       this.endAt = null;
     } else {
-      this.endAt = Math.max(now + 60, this.startAt + minutes * 60);
+      this.endAt = Math.max(now + 60, this.blockStart + minutes * 60);
     }
     this.timerDone = false;
     this.armSafetyNet();
@@ -497,7 +562,7 @@ export class Session extends EventTarget {
   private armSafetyNet(): void {
     if (!this.engine) return;
     const p = this.prefs;
-    if (this.endAt === null || p.keepPlaying || p.breakMinutes > 0) {
+    if (this.endAt === null || p.keepPlaying || p.breakMinutes > 0 || this.windStartedAt !== null) {
       this.engine.clearEnd();
       return;
     }
@@ -511,7 +576,7 @@ export class Session extends EventTarget {
       this.engine.setBeatPlan(null);
       return;
     }
-    const t0 = this.startAt;
+    const t0 = this.blockStart;
     const ramp = p.rampMin * 60;
     const plan: Plan = [[t0, p.rampFrom], [t0 + ramp, p.beatHz]];
     if (this.endAt !== null && p.rampReturn && !this.prefs.keepPlaying) {
@@ -555,8 +620,7 @@ export class Session extends EventTarget {
     if (this.inBreak && this.engine) {
       const now = this.ctx?.currentTime ?? 0;
       if (this.prefs.endBell) this.engine.chime(now + 0.05, 0.8);
-      this.inBreak = false;
-      this.endAt = this.prefs.minutes ? now + this.prefs.minutes * 60 : null;
+      // resume() sees inBreak and starts the next block.
       void this.resume();
       return;
     }
@@ -567,13 +631,19 @@ export class Session extends EventTarget {
     const wall = Date.now();
     const gap = wall - this.lastWall;
     this.lastWall = wall;
-    // A long gap means the Mac slept. Never resume on our own after that.
-    if (gap > 15000 && this.isRunning()) {
+    const audio = this.ctx?.currentTime ?? 0;
+    const audioGap = audio - this.lastAudio;
+    this.lastAudio = audio;
+    // A long gap in which the audio clock also stood still means the Mac slept (a page that was
+    // merely slow would have kept rendering). Never resume on our own after that.
+    if (gap > 15000 && this.isRunning() && !this.pausedForDevice && this.ctx?.state !== 'suspended' && audioGap < (gap / 1000) * 0.5) {
+      this.engine?.silence();
+      void this.ctx?.suspend();
       this.finish();
       this.setNotice({ text: 'Stopped while your Mac slept.', actions: [{ id: 'start', label: 'Start again' }] });
       return;
     }
-    if (!this.ctx || !this.isRunning()) return;
+    if (!this.ctx || !this.isRunning() || this.pausedForDevice) return;
     const now = this.ctx.currentTime;
     if (this.phase === 'playing' && this.endAt !== null && now >= this.endAt) this.onTimerEnd();
     if (this.restEndsAt !== null && now >= this.restEndsAt && this.ctx.state === 'running') this.onRestEnd();
@@ -588,59 +658,76 @@ export class Session extends EventTarget {
 
   private onContextState(): void {
     const state = this.ctx?.state as string | undefined;
-    if (state === 'interrupted' && this.phase === 'playing') {
-      this.setNotice({ text: 'Sound was interrupted by the system.', actions: [{ id: 'resume', label: 'Resume' }] });
-      void this.windDown();
+    if (state === 'interrupted' && this.engine && this.phase !== 'ready') {
+      // Fades can't run on a stopped clock: mute now, so the system can't resume us at full level.
+      this.pauseQuietly('Sound was interrupted by the system.');
     }
   }
 
   /** Called when the system's audio output changes. */
   onOutputChange(change: { change: string; previous: { name: string; kind: string } | null; current: { name: string; kind: string } | null }): void {
     this.output = change.current;
-    this.engine?.setParams(this.engineParams(), 1);
-    if (change.change === 'removed' && this.phase === 'playing' && this.engine) {
-      // The only true pause: mute at once so nothing comes out of the speakers.
-      this.engine.fade(0, 0.04);
-      this.wasPlayingBeforeDeviceLoss = true;
-      this.deviceLost = { name: change.previous?.name ?? 'Headphones', at: Date.now() };
-      this.phase = 'resting';
-      setTimeout(() => void this.ctx?.suspend(), 120);
-      this.setNotice({
-        text: `${change.previous?.kind === 'headphones' ? 'Headphones out' : `${change.previous?.name ?? 'Output'} gone`}, paused.`,
-        actions: [
-          { id: 'resume', label: 'Resume' },
-          { id: 'end', label: 'End' },
-        ],
-      });
-      this.emit();
+    if (change.change === 'muted') {
+      if (this.isRunning()) this.setNotice({ text: 'Your Mac’s sound is muted.' });
       return;
     }
-    if (this.deviceLost && change.current && change.current.name === this.deviceLost.name && Date.now() - this.deviceLost.at < 60000 && this.wasPlayingBeforeDeviceLoss) {
+    if (change.change === 'unmuted') {
+      if (this.notice?.text === 'Your Mac’s sound is muted.') this.setNotice(null);
+      return;
+    }
+    this.engine?.setParams(this.engineParams(), 1);
+    if (change.change === 'removed' && this.engine && this.phase !== 'ready') {
+      if (this.phase === 'ending') {
+        // Already on the way out: stop here rather than finish on the speakers.
+        this.engine.silence();
+        this.finish();
+        return;
+      }
+      // The one fast change: mute at once so nothing comes out of the speakers, in any phase.
+      const lost = change.previous;
+      this.pauseQuietly(`${lost?.kind === 'headphones' ? 'Headphones out' : `${lost?.name ?? 'Output'} gone`}, paused.`);
+      this.deviceLost = { name: lost?.name ?? 'Headphones', at: Date.now() };
+      return;
+    }
+    if (
+      this.deviceLost && this.pausedForDevice && this.engine && this.phase === 'resting' &&
+      change.current?.name === this.deviceLost.name && Date.now() - this.deviceLost.at < 60000
+    ) {
       // The same headphones came back within a minute: fade back in gently.
-      this.deviceLost = null;
-      this.wasPlayingBeforeDeviceLoss = false;
-      void this.ensureContext().then(() => {
-        this.engine?.setLanding(false, 1);
-        this.engine?.fade(1, 8);
-        this.phase = 'playing';
-        this.setNotice({ text: `Back on ${change.current?.name}.`, ttl: 4 });
-        this.emit();
-      });
+      void this.resume().then(() => this.setNotice({ text: `Back on ${change.current?.name}.`, ttl: 4 }));
       return;
     }
     if (change.change === 'switched' && change.current && this.phase === 'playing' && this.engine) {
       // Dip and come back up over 3 s on the new output.
       this.engine.fade(0, 0.15);
-      setTimeout(() => this.engine?.fade(1, 3), 400);
+      if (this.switchTimer) clearTimeout(this.switchTimer);
+      this.switchTimer = setTimeout(() => {
+        this.switchTimer = null;
+        if (this.phase === 'playing') this.engine?.fade(1, 3);
+      }, 400);
       this.setNotice({ text: `Now through ${change.current.name}.`, ttl: 4 });
     }
+    this.emit();
+  }
+
+  /** Mute at once and hold, with timers frozen, until the person chooses Resume or End. */
+  private pauseQuietly(message: string): void {
+    if (!this.engine) return;
+    this.clearPhaseTimer();
+    this.engine.silence();
+    this.pausedForDevice = true;
+    if (this.phase === 'playing') this.windStartedAt = this.ctx?.currentTime ?? 0;
+    this.engine.clearEnd();
+    this.phase = 'resting';
+    setTimeout(() => void this.ctx?.suspend(), 80);
+    this.setNotice({ text: message, actions: [{ id: 'resume', label: 'Resume' }, { id: 'end', label: 'End' }] });
+    this.updateKeepAwake();
     this.emit();
   }
 
   async noticeAction(id: string): Promise<void> {
     this.setNotice(null);
     this.deviceLost = null;
-    this.wasPlayingBeforeDeviceLoss = false;
     if (id === 'resume') {
       if (this.phase === 'resting' || this.phase === 'winding') await this.resume();
       else if (this.phase === 'ready') await this.start();

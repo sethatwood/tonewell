@@ -6,6 +6,8 @@ import workletUrl from '../../src/audio/worklets/processors.js?url';
 import { renderOffline } from '../../src/audio/render';
 import { defaultParams, mergeParams, type SoundParams } from '../../src/audio/params';
 import { BUILTIN_PRESETS, presetParams } from '../../src/presets/builtin';
+import { Session } from '../../src/session/session';
+import { WebAudioEngine } from '../../src/audio/engine';
 
 interface Result {
   name: string;
@@ -306,6 +308,78 @@ async function disposeCheck(out: Result[]): Promise<void> {
   });
 }
 
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Browsers only start real-time audio after a click; the check script clicks this first.
+let unlocked: AudioContext | null = null;
+document.getElementById('unlock')?.addEventListener('click', () => {
+  unlocked = new AudioContext({ latencyHint: 'playback' });
+  void unlocked.resume();
+});
+
+/** Await with a deadline, so a stalled step fails its check instead of hanging the run. */
+async function within<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`timed out: ${what}`)), ms);
+  });
+  try {
+    return await Promise.race([p, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** The session's state machine on a real AudioContext: guards, pauses and timers. */
+async function sessionChecks(out: Result[]): Promise<void> {
+  // Two starts at once (double-click, or Space plus a media key) must make one engine.
+  let created = 0;
+  const create = WebAudioEngine.create;
+  WebAudioEngine.create = async (...args: Parameters<typeof create>) => {
+    created++;
+    return create(...args);
+  };
+  const a = new Session();
+  if (!unlocked) throw new Error('audio was not unlocked by a click');
+  (a as unknown as { ctx: AudioContext }).ctx = unlocked;
+  a.setPrefs({ minutes: 10, fadeIn: 5 });
+  await within(Promise.all([a.start(), a.start(), a.go()]), 8000, 'start');
+  out.push({ name: 'session: starting twice makes one engine', pass: created === 1 && a.phase === 'playing', detail: { engines: created, phase: a.phase } });
+  WebAudioEngine.create = create;
+
+  // Resting by hand pauses the timer.
+  await wait(1000);
+  const before = a.remaining() ?? 0;
+  await a.windDown();
+  await wait(7000);
+  const restingPhase = a.phase;
+  await within(a.resume(), 5000, 'resume');
+  const after = a.remaining() ?? 0;
+  out.push({
+    name: 'session: resting by hand pauses the timer',
+    pass: restingPhase === 'resting' && Math.abs(after - before) < 1.5,
+    detail: { phaseWhileResting: restingPhase, remainingBefore: before.toFixed(1), remainingAfter: after.toFixed(1) },
+  });
+
+  // Headphones out while resting: mute, pause, freeze; the same headphones back: resume.
+  await a.windDown();
+  await wait(6500);
+  a.onOutputChange({ change: 'removed', previous: { name: 'Test Headphones', kind: 'headphones' }, current: { name: 'Speakers', kind: 'speakers' } });
+  await wait(300);
+  const paused = a.snapshot();
+  const ctxState = (a as unknown as { ctx: AudioContext }).ctx.state;
+  a.onOutputChange({ change: 'switched', previous: { name: 'Speakers', kind: 'speakers' }, current: { name: 'Test Headphones', kind: 'headphones' } });
+  await wait(500);
+  out.push({
+    name: 'session: headphones out while resting pauses; back again resumes',
+    pass: paused.phase === 'resting' && (paused.notice?.text ?? '').startsWith('Headphones out') && ctxState === 'suspended' && a.phase === 'playing',
+    detail: { pausedPhase: paused.phase, notice: paused.notice?.text ?? '', ctxState, phaseAfter: a.phase },
+  });
+  a.end(0.5);
+  await wait(1200);
+  out.push({ name: 'session: End returns to ready', pass: a.phase === 'ready', detail: { phase: a.phase } });
+}
+
 async function texturesCheck(out: Result[]): Promise<void> {
   const sr = 48000;
   const tex: Array<[string, Partial<SoundParams>]> = [
@@ -350,7 +424,7 @@ async function longRunCheck(out: Result[]): Promise<void> {
 async function run(): Promise<Result[]> {
   const out: Result[] = [];
   const status = document.getElementById('status')!;
-  const steps = [presetChecks, binauralCheck, rampCheck, monauralCheck, landingCheck, volumeCheck, endCheck, disposeCheck, texturesCheck, longRunCheck];
+  const steps = [presetChecks, binauralCheck, rampCheck, monauralCheck, landingCheck, volumeCheck, endCheck, disposeCheck, sessionChecks, texturesCheck, longRunCheck];
   for (const step of steps) {
     status.textContent = `Running ${step.name}…`;
     try {

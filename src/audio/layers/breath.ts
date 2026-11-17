@@ -70,6 +70,7 @@ export class Breath {
   }
 
   apply(e: SoundParams, now: number, tau: number, s: Smoother): void {
+    if (!e.breathOn && !this.gate.awake) return;
     s.set(this.band.frequency, e.breathCenter, now, tau);
     s.set(this.band.Q, e.breathQ, now, tau);
     s.set(this.lfo.frequency, 1 / e.breathPeriod, now, tau);

@@ -171,6 +171,12 @@ export class Bells {
     list?.add({ start: t, stop: () => oscs.forEach(safeStop) });
   }
 
+  /** Break the echo's feedback loop so the old graph can be released. */
+  dispose(): void {
+    this.feedback.disconnect();
+    this.delay.disconnect();
+  }
+
   tick(now: number): void {
     this.gate.tick(now);
     this.shimmerGate.tick(now);

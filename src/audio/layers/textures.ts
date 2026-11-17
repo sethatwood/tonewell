@@ -80,7 +80,7 @@ export class Textures {
     while (base > 40) base /= 2;
     this.set('shepardBase', base, now);
     this.set('shepardRate', 1 / (e.shepardMinutes * 60), now);
-    s.set(this.noiseTone.frequency, e.noiseTone, now, tau);
+    if (this.gates.noise.awake) s.set(this.noiseTone.frequency, e.noiseTone, now, tau);
   }
 
   /** Let the generator finish so it can be garbage-collected. */

@@ -42,6 +42,8 @@ export interface AudioEngine {
   setVolume(v: number): void;
   /** Fade the session gain to `to` over `seconds`, along a smooth S-curve. */
   fade(to: number, seconds: number): void;
+  /** Mute at once (interruptions, lost headphones); the next fade rises from silence. */
+  silence(): void;
   /** Fade out starting at audio time `at`, over `seconds`. */
   scheduleEnd(at: number, seconds: number): void;
   clearEnd(): void;
@@ -94,6 +96,10 @@ export class WebAudioEngine implements AudioEngine {
   private timerGain!: GainNode;
   private volumeGain!: GainNode;
   private landingGain!: GainNode;
+  /** Every bus node outside the layers, so dispose can detach them all. */
+  private buses: AudioNode[] = [];
+  /** True after silence(): the session gain is known to be 0 even if nothing has rendered since. */
+  private silenced = false;
   private analyser!: AnalyserNode;
   private freqBuf = new Uint8Array(512);
   private timeBuf = new Float32Array(1024);
@@ -103,6 +109,7 @@ export class WebAudioEngine implements AudioEngine {
   private walkNext = 0;
   private lastPump = 0;
   private lastShape = -1;
+  private lastTick = 0;
   private interval: ReturnType<typeof setInterval> | null = null;
   private clock: AudioWorkletNode | null = null;
   private disposed = false;
@@ -157,6 +164,7 @@ export class WebAudioEngine implements AudioEngine {
     this.analyser.smoothingTimeConstant = 0.85;
     this.fadeGain.connect(this.timerGain).connect(this.volumeGain).connect(limiter).connect(clip).connect(this.analyser);
     this.analyser.connect(ctx.destination);
+    this.buses.push(this.fadeGain, this.timerGain, this.volumeGain, limiter, clip, this.analyser);
 
     // The bed: dry and reverb through the width stage and the prototype's glue compressor.
     const dry = ctx.createGain();
@@ -170,6 +178,7 @@ export class WebAudioEngine implements AudioEngine {
     // Soft landing lowers the bed after the glue compressor, which would otherwise level the drop out.
     this.landingGain = ctx.createGain();
     this.width.output.connect(glue).connect(this.landingGain).connect(this.fadeGain);
+    this.buses.push(dry, glue, this.landingGain, this.width.input, this.width.output, this.reverb.input, this.reverb.output);
 
     this.drone = new Drone(ctx, dry, this.reverb.input);
     this.breath = new Breath(ctx, dry, this.reverb.input, this.seed + 1);
@@ -263,6 +272,9 @@ export class WebAudioEngine implements AudioEngine {
       if (from !== null) this.bellNext = Math.min(this.bellNext, from);
       if (next.bellsOn && !prev.bellsOn) this.bellNext = Math.min(this.bellNext, now + 1.5);
     }
+    if (prev.root !== next.root || prev.voicing !== next.voicing || prev.walkPattern !== next.walkPattern || prev.a432 !== next.a432 || prev.justTuning !== next.justTuning) {
+      this.walkNext = now + this.walkGap();
+    }
     if (prev.shimmerOn !== next.shimmerOn || prev.shimmerLevel !== next.shimmerLevel || prev.root !== next.root) {
       const from = this.bells.rescheduleShimmerFrom(now + 0.05);
       if (from !== null) this.shimmerNext = Math.min(this.shimmerNext, from);
@@ -309,7 +321,9 @@ export class WebAudioEngine implements AudioEngine {
   fade(to: number, seconds: number): void {
     const g = this.fadeGain.gain;
     const now = this.ctx.currentTime;
-    const from = g.value;
+    // After silence() nothing may have rendered yet, so g.value could still report the old level.
+    const from = this.silenced ? 0 : g.value;
+    this.silenced = false;
     g.cancelScheduledValues(now);
     if (seconds <= 0.02) {
       g.setTargetAtTime(to, now, 0.01);
@@ -326,10 +340,26 @@ export class WebAudioEngine implements AudioEngine {
       g.setValueCurveAtTime(curve, now, seconds);
     } catch {
       // Some engines refuse a curve that overlaps a cancelled one; an exponential approach is close enough.
-      g.cancelScheduledValues(now);
-      g.setValueAtTime(from, now);
+      try {
+        g.cancelScheduledValues(now);
+        g.setValueAtTime(from, now);
+      } catch {
+        // Keep going: the approach below still lands on the target.
+      }
       g.setTargetAtTime(to, now, seconds / 4);
     }
+  }
+
+  silence(): void {
+    const g = this.fadeGain.gain;
+    const now = this.ctx.currentTime;
+    try {
+      g.cancelScheduledValues(now);
+    } catch {
+      // Nothing to cancel.
+    }
+    g.setValueAtTime(0, now);
+    this.silenced = true;
   }
 
   scheduleEnd(at: number, seconds: number): void {
@@ -407,14 +437,16 @@ export class WebAudioEngine implements AudioEngine {
       this.shimmerNext += SHIMMER_GAP * (0.5 + this.random());
     }
     if (e) this.voices.pump(now, horizon, (t) => this.drone.rootAt(t));
-    while (this.walkNext < horizon) {
+    // Root steps are placed at most a second ahead, so a key change is never undone by a stale step.
+    while (this.walkNext < now + 1) {
       if (e && e.walkOn && this.walkNext >= now) this.drone.walkStep(e, this.walkNext);
       this.walkNext += this.walkGap();
     }
 
-    // Drift and housekeeping, about once a second.
-    if (now - this.lastShape >= 1) {
-      this.applyAll(1.5);
+    // Drift moves over minutes, so re-shaping every few seconds is plenty and keeps automation lean.
+    if (now - this.lastShape >= 4) this.applyAll(2.5);
+    if (now - this.lastTick >= 1) {
+      this.lastTick = now;
       this.drone.tick(now);
       this.beat.tick(now);
       this.breath.tick(now);
@@ -454,16 +486,22 @@ export class WebAudioEngine implements AudioEngine {
       this.clock.port.postMessage('stop');
       this.clock.disconnect();
     }
-    try {
-      this.analyser.disconnect();
-    } catch {
-      // Already disconnected.
+    for (const n of this.buses) {
+      try {
+        n.disconnect();
+      } catch {
+        // Already disconnected.
+      }
     }
     const at = this.ctx.currentTime;
     this.drone.stop(at);
     this.breath.stop(at);
     this.beat.stop(at);
     this.voices.stop(at);
+    this.bells.dispose();
     this.textures?.stop();
+    for (const g of [this.drone.gate, this.drone.subGate, this.breath.gate, this.beat.gate, this.voices.gate, this.bells.gate, this.bells.shimmerGate]) {
+      g.node.disconnect();
+    }
   }
 }
