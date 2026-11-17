@@ -2,12 +2,12 @@
 // ladder, and three scales (Volume, Warmth, Drift) plus the Beat chip.
 // Only text and color change between states; the layout never moves.
 
-import { bandName } from '../audio/tuning';
 import { toSlider, fromSlider, formatParam } from '../audio/params';
 import type { Session, Snapshot } from '../session/session';
 import { ICONS, h, icon, radios, scale } from './controls';
 import { check, item, popup, sep, submenu, type MenuNode } from './menu';
 import { Well } from './well';
+import { BEAT_CHOICES, beatLong, beatMenuNodes, beatShort, choiceParams } from './beats';
 
 export interface PlayerActions {
   toggleExpanded(): void;
@@ -21,14 +21,6 @@ export interface PlayerActions {
 }
 
 const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
-
-export const BEAT_CHOICES: Array<{ hz: number | null; label: string }> = [
-  { hz: null, label: 'Off' },
-  { hz: 2, label: 'Delta, 2 Hz' },
-  { hz: 6, label: 'Theta, 6 Hz' },
-  { hz: 10, label: 'Alpha, 10 Hz' },
-  { hz: 15, label: 'Low beta, 15 Hz' },
-];
 
 export const LENGTHS: Array<number | null> = [10, 15, 20, 30, 45, 60, 90, null];
 
@@ -45,13 +37,7 @@ export function lengthMenu(s: Snapshot): MenuNode[] {
 }
 
 export function beatMenu(s: Snapshot): MenuNode[] {
-  return [
-    ...BEAT_CHOICES.map((b) =>
-      check(`beat:${b.hz ?? 'off'}`, b.label, b.hz === null ? !s.params.beatOn : !!s.params.beatOn && Math.abs(s.params.beatHz - b.hz) < 0.05),
-    ),
-    sep,
-    item('beat:more', 'More beat settings…'),
-  ];
+  return beatMenuNodes(s.params, s.mode);
 }
 
 export function presetMenu(session: Session, s: Snapshot): MenuNode[] {
@@ -90,11 +76,11 @@ export async function handleMenuId(id: string, session: Session, actions: Player
     if (v === 'more') {
       actions.expand();
       document.dispatchEvent(new CustomEvent('tonewell:panel-tab', { detail: 'beat' }));
-    } else if (v === 'off') session.setParam('beatOn', 0);
+    } else if (v === 'learn') actions.openLearn('brainwave-bands');
+    else if (v === 'off') session.setParam('beatOn', 0);
     else {
-      session.setParam('beatHz', Number(v));
-      session.setParam('rampOn', 0);
-      session.setParam('beatOn', 1);
+      const choice = BEAT_CHOICES.find((c) => c.id === v);
+      if (choice) session.setParams(choiceParams(choice));
     }
   } else if (id.startsWith('preset:')) {
     session.setPreset(id.slice(7));
@@ -291,15 +277,14 @@ export class Player {
     if (document.activeElement !== this.warmth.input) this.warmth.set(toSlider('warmth', s.params.warmth));
     if (document.activeElement !== this.drift.input) this.drift.set(toSlider('motion', s.params.motion));
 
+    // The chip shows the setting (what the menu ticks), never a passing value mid-glide.
     const beatOn = !!s.params.beatOn;
-    const hz = s.phase === 'playing' ? this.session.beatHzNow() : s.params.beatHz;
-    this.beatValue.textContent = beatOn ? `${hz < 10 ? hz.toFixed(1).replace(/\.0$/, '') : Math.round(hz)} Hz` : 'Off';
+    this.beatValue.textContent = beatShort(s.params);
     const speakers = s.output?.kind === 'speakers';
     this.beatGlyph.replaceChildren(icon(speakers ? ICONS.speaker : ICONS.headphones));
-    this.beatBtn.setAttribute(
-      'aria-label',
-      beatOn ? `Beat: ${hz.toFixed(1)} hertz, ${bandName(hz)}. ${speakers ? 'Playing through speakers.' : ''} Change beat` : 'Beat: off. Change beat',
-    );
+    const long = beatLong(s.params);
+    this.beatBtn.setAttribute('aria-label', `${long}.${beatOn && speakers ? ' Playing through speakers.' : ''} Change beat`);
+    this.beatBtn.title = long;
     this.beatBtn.dataset.on = String(beatOn);
 
     this.scheduleMinute(s);

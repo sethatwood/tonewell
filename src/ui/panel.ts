@@ -4,6 +4,7 @@
 import { BAND_EDGES, PARAMS, formatParam, toSlider, type ParamId } from '../audio/params';
 import { bandName, noteName } from '../audio/tuning';
 import { tunedCarrier } from '../audio/shape';
+import { BAND_USES, BEAT_CHOICES, choiceParams, currentChoice, fmtHz } from './beats';
 import type { Session, Snapshot } from '../session/session';
 import { ICONS, h, icon, paramScale, radios, scale, switchControl } from './controls';
 
@@ -249,6 +250,24 @@ export class Panel {
     const ruler = h('div', { class: 'band-ruler', 'aria-hidden': 'true' }, ...['Delta', 'Theta', 'Alpha', 'Beta', 'Gamma'].map((b) => h('span', { 'data-band': b.toLowerCase() }, b)));
     const bandsLink = h('button', { class: 'link' }, 'What the bands are, and aren’t');
     bandsLink.addEventListener('click', () => this.openLearn('brainwave-bands'));
+    // While a glide is under way, what's playing right now (the readout shows the setting).
+    const live = h('p', { class: 'beat-live', 'aria-live': 'off' });
+    const useLine = h('p', { class: 'field-help beat-use' });
+
+    // Quick picks, grouped by what each beat is commonly used for.
+    const pickButtons: Array<{ el: HTMLButtonElement; id: string }> = [];
+    const pickRow = (use: 'meditate' | 'focus') => {
+      const row = h('div', { class: 'pick-row', role: 'group', 'aria-label': use === 'meditate' ? 'For meditation' : 'For focus' },
+        h('span', { class: 'pick-label' }, use === 'meditate' ? 'For meditation' : 'For focus'));
+      for (const c of BEAT_CHOICES.filter((x) => x.use === use)) {
+        const b = h('button', { class: 'pick', 'aria-pressed': 'false', title: `Commonly used for ${c.purpose}` }, c.label);
+        b.addEventListener('click', () => this.session.setParams(choiceParams(c)));
+        pickButtons.push({ el: b, id: c.id });
+        row.append(b);
+      }
+      return row;
+    };
+    const picks = h('div', { class: 'beat-picks' });
 
     const tuned = switchControl('Tuned to the drone', !!p().carrierTuned, (on) => this.set('carrierTuned', on ? 1 : 0), true);
     const carrier = paramScale('carrier', this.get('carrier'), this.set);
@@ -271,7 +290,8 @@ export class Panel {
       h('div', { class: 'field field-switch' }, h('span', { class: 'field-label strong' }, 'Beat'), onSw.el),
       h('div', { class: 'field field-wide' }, type.el),
       deviceRow,
-      h('div', { class: 'beat-block' }, readout, beat.el, ruler, bandsLink),
+      h('div', { class: 'beat-block' }, readout, live, beat.el, ruler, useLine, bandsLink),
+      picks,
       h('div', { class: 'field field-switch' }, h('span', { class: 'field-label' }, 'Tuned to the drone'), tuned.el),
       h('div', { class: 'field' }, carrier.el),
       h('div', { class: 'field' }, level.el),
@@ -285,6 +305,18 @@ export class Panel {
       evidence,
     );
 
+    const updateLive = () => {
+      const s = this.session;
+      const now = s.phase === 'playing' ? s.beatHzNow() : null;
+      const gliding = now !== null && !!s.params.beatOn && Math.abs(now - s.params.beatHz) > 0.05;
+      live.hidden = !gliding;
+      if (gliding && now !== null) live.textContent = `Now ${fmtHz(now)} Hz, gliding to ${fmtHz(s.params.beatHz)}`;
+    };
+    // Refresh the live line once a second, only while it can be seen.
+    setInterval(() => {
+      if (!v.hidden && this.el.isConnected && document.querySelector('.app.expanded') && !document.hidden) updateLive();
+    }, 1000);
+
     this.refreshers.push((s) => {
       onSw.set(!!s.params.beatOn);
       type.set(s.params.beatMode);
@@ -294,12 +326,19 @@ export class Panel {
       else if (s.params.beatMode === 0) device.textContent = 'Binaural beats need headphones: each ear gets its own tone.';
       else if (s.params.beatMode === 1) device.textContent = 'Monaural beats work on speakers: the pulse is in the sound itself.';
       else device.textContent = 'Isochronic tones work on speakers: one tone, gently pulsed.';
-      const hz = s.phase === 'playing' ? this.session.beatHzNow() : s.params.beatHz;
-      readNum.textContent = hz < 10 ? hz.toFixed(1) : String(Math.round(hz));
-      readUnit.textContent = ` Hz, ${bandName(hz)}`;
+      // The readout shows the setting; the live line below it shows a glide in progress.
+      const target = s.params.beatHz;
+      readNum.textContent = target < 10 ? target.toFixed(1) : String(Math.round(target));
+      readUnit.textContent = s.params.rampOn ? ` Hz, ${bandName(target)}, after gliding from ${fmtHz(s.params.rampFrom)} Hz` : ` Hz, ${bandName(target)}`;
       beat.refresh();
-      const band = bandName(s.params.beatHz);
+      const band = bandName(target);
       ruler.querySelectorAll<HTMLElement>('span').forEach((sp) => sp.toggleAttribute('data-active', sp.dataset.band === band));
+      useLine.textContent = `${BAND_USES[band]} These are common uses, not proven effects.`;
+      updateLive();
+      // In Focus, the focus picks come first.
+      picks.replaceChildren(...(s.mode === 'focus' ? [pickRow('focus'), pickRow('meditate')] : [pickRow('meditate'), pickRow('focus')]));
+      const cur = currentChoice(s.params);
+      for (const b of pickButtons) b.el.setAttribute('aria-pressed', String(cur?.id === b.id));
       tuned.set(!!s.params.carrierTuned);
       carrier.input.disabled = !!s.params.carrierTuned;
       if (s.params.carrierTuned) carrier.el.querySelector('.scale-value')!.textContent = `${Math.round(tunedCarrier(s.params))} Hz, on the drone`;
@@ -309,7 +348,7 @@ export class Panel {
       const f = s.params.rampFrom;
       const t = s.params.beatHz;
       sentence.textContent = s.params.rampOn
-        ? `Start at ${fmtHz(f)} and glide to ${fmtHz(t)} over ${s.params.rampMin} min.${s.params.rampReturn ? ` Rise back to ${fmtHz(f)} in the last ${s.params.returnMin} min.` : ''}`
+        ? `Start at ${fmtHzUnit(f)} and glide to ${fmtHzUnit(t)} over ${s.params.rampMin} min.${s.params.rampReturn ? ` Rise back to ${fmtHzUnit(f)} in the last ${s.params.returnMin} min.` : ''}`
         : 'Hold one beat for the whole session.';
       drawCurve(curve, s);
       from.refresh();
@@ -394,8 +433,8 @@ export class Panel {
   }
 }
 
-function fmtHz(v: number): string {
-  return `${v < 10 ? v.toFixed(1).replace(/\.0$/, '') : Math.round(v)} Hz`;
+function fmtHzUnit(v: number): string {
+  return `${fmtHz(v)} Hz`;
 }
 
 function drawCurve(svg: SVGSVGElement, s: Snapshot): void {
@@ -414,6 +453,6 @@ function drawCurve(svg: SVGSVGElement, s: Snapshot): void {
   }
   const bands = BAND_EDGES.slice(1, -1).map((e) => `<path d="M0 ${y(e)} H360" class="glide-grid"/>`).join('');
   svg.innerHTML = `${bands}<path d="${d}" class="glide-path"/>`;
-  svg.setAttribute('aria-label', p.rampOn ? `Beat glides from ${fmtHz(p.rampFrom)} to ${fmtHz(p.beatHz)}` : `Beat holds at ${fmtHz(p.beatHz)}`);
+  svg.setAttribute('aria-label', p.rampOn ? `Beat glides from ${fmtHzUnit(p.rampFrom)} to ${fmtHzUnit(p.beatHz)}` : `Beat holds at ${fmtHzUnit(p.beatHz)}`);
   void formatParam;
 }

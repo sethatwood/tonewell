@@ -4,7 +4,8 @@
 import type { Session, Snapshot } from '../session/session';
 import { invoke } from '../platform/bridge';
 import { check, item, sep, submenu, type MenuNode } from './menu';
-import { BEAT_CHOICES, LENGTHS, lengthLabel } from './player';
+import { LENGTHS, lengthLabel } from './player';
+import { beatMenuNodes, beatShort } from './beats';
 
 const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
 
@@ -43,12 +44,8 @@ export function trayMenu(session: Session, s: Snapshot, shortcuts: boolean): Men
       sep,
       ...[20, 40, 60, 80].map((v) => check(`volume:${v}`, `${v}%`, Math.abs(s.volume * 100 - v) < 2.5)),
     ]),
-    submenu(
-      'Beat',
-      BEAT_CHOICES.map((b) =>
-        check(`beat:${b.hz ?? 'off'}`, b.label, b.hz === null ? !s.params.beatOn : !!s.params.beatOn && Math.abs(s.params.beatHz - b.hz) < 0.05),
-      ),
-    ),
+    // The same grouped choices as the mini player's Beat menu.
+    submenu(`Beat: ${beatShort(s.params)}`, beatMenuNodes(s.params, s.mode)),
     sep,
     item('show', 'Show mini player'),
     item('visuals', 'Open visuals'),

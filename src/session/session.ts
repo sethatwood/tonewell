@@ -279,6 +279,25 @@ export class Session extends EventTarget {
     this.afterParamChange();
   }
 
+  /** Change several parameters as one step: one glide, one beat plan, one save. */
+  setParams(patch: Partial<SoundParams>): void {
+    const next = { ...this.current.params };
+    let changed = false;
+    let beat = false;
+    for (const [k, value] of Object.entries(patch) as Array<[ParamId, number]>) {
+      const v = clampParam(k, value);
+      if (next[k] === v) continue;
+      next[k] = v;
+      changed = true;
+      if (k.startsWith('ramp') || k === 'beatHz' || k === 'beatOn' || k === 'returnMin') beat = true;
+    }
+    if (!changed) return;
+    this.current.params = next;
+    this.engine?.setParams(this.engineParams(), 0.15);
+    if (beat) this.applyBeatPlan(2);
+    this.afterParamChange();
+  }
+
   /** What the engine plays: binaural becomes monaural on speakers, where binaural can't work. */
   private engineParams(): SoundParams {
     const p = this.params;
