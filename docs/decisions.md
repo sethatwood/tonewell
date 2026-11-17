@@ -168,3 +168,25 @@ links, and every factual sentence points to one. Sources were checked by
 opening the record (PubMed via NCBI's E-utilities, Crossref or the
 publisher). Where only an abstract could be read, the card only claims what
 the abstract says, and where evidence is thin the card says so.
+
+## 13. Media keys only while a session runs
+
+**Decision.** While a session is playing or resting, Tonewell registers
+with macOS's Now Playing controls (MPRemoteCommandCenter and
+MPNowPlayingInfoCenter, from the Rust side), so the play/pause key and
+headphone buttons walk the same ladder as Esc: start, wind down, end. When
+no session is running it reports itself stopped and clears its Now Playing
+entry, so those keys go back to Music, Spotify or whatever else was
+playing.
+
+**Why.** Eyes-closed control is the point: during a sit the headphones are
+the only control within reach. Holding on to the media keys while idle
+would steal them from other apps.
+
+## 14. Errors are logged locally, never reported
+
+**Decision.** Uncaught errors in any window are written to the app's
+standard error output, and diagnostics flags (`TONEWELL_AUTOSTART`,
+`TONEWELL_HIDE`, `TONEWELL_LOG`, `TONEWELL_PRESET`, `TONEWELL_OPEN`) let
+automated checks start sessions, hide the window and print the
+scheduler's health. Nothing is sent anywhere.

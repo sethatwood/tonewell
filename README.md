@@ -30,7 +30,9 @@ hours of unobtrusive sound alongside your other apps.
   It runs down once a minute, never ticking seconds at you.
 - **One way to stop, and it's gentle.** Wind down (or Esc) settles
   everything into a low, warm hum in about six seconds and waits there.
-  Resume or End when you're ready. Nothing ever cuts off.
+  Resume or End when you're ready. Nothing ever cuts off. The keyboard's
+  play/pause key and a press on AirPods do the same, so you can come down
+  without opening your eyes.
 - **Meditate and Focus.** Meditate has a wandering drone, bells and a
   theta beat that glides down from alpha. Focus is steadier: noise beds,
   rain, a still drone, no bells, no beat unless you ask.
