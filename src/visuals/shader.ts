@@ -1,13 +1,17 @@
-// The visuals' fragment shader: the original prototype's four scenes, plus a
-// near-static Ember scene for eyes-closed sessions. One shader, scene chosen
+// The visuals' fragment shader: the original prototype's four scenes, five more,
+// and a near-static Ember scene for eyes-closed sessions. One shader, scene chosen
 // by uniform; scenes cross-fade by mixing two scene evaluations.
 
-export const SCENES = ['Chrysanthemum', 'The Tunnel', 'Liquid Jewel', 'Infinite Lattice', 'Ember'] as const;
+export const SCENES = [
+  'Chrysanthemum', 'The Tunnel', 'Liquid Jewel', 'Infinite Lattice',
+  'Aurora', 'Mandala', 'Yantra', 'Moiré', 'Truchet', 'Ember',
+] as const;
+export const EMBER = SCENES.length - 1;
 
 export const VERT = `attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}`;
 
 export const FRAG = `precision highp float;
-uniform vec2 R;uniform float T,mixv,sa,sb,bass,hi,fade,bright,sat;
+uniform vec2 R;uniform float T,mixv,sa,sb,bass,hi,fade,bright,sat,pacer,pacerPhase;
 #define TAU 6.2831853
 mat2 rot(float a){float c=cos(a),s=sin(a);return mat2(c,-s,s,c);}
 vec3 pal(float t){vec3 a=.5+.5*cos(TAU*(t+vec3(0.,.33,.67)));vec3 b=.5+.5*cos(TAU*(t+vec3(0.,.15,.3)+.55));return mix(a,b,.5+.5*sin(T*.017));}
@@ -45,19 +49,74 @@ vec3 s3(vec2 p,float t){
     vec3 c=pal(fi*.23+t*.02+h21(h.zw)*.15);
     col+=c*w*(exp(-d1*28.)*.55+exp(-d2*36.)*.4+exp(-hd*50.)*.3);
   }return col;}
-// Ember: a dim, warm glow that breathes once every twenty seconds. For eyes-closed sits.
+// Aurora: curtains of light rising from a slow, wavy lower edge.
 vec3 s4(vec2 p,float t){
+  vec3 col=vec3(0);
+  for(int i=0;i<3;i++){
+    float fi=float(i);
+    float x=p.x*(1.2+fi*.35)+t*.03*(1.+fi*.4)+fi*3.1;
+    float wave=fbm(vec2(x*1.3,t*.05+fi))*1.2-.4;
+    float y=p.y-(.06*fi-.3)-wave*.3;
+    float rays=pow(fbm(vec2(x*9.,t*.08+fi*2.)),1.4)*1.7;
+    float curtain=exp(-max(y,0.)*3.2)*smoothstep(-.04,.08,y)*rays;
+    col+=pal(.35+fi*.12+wave*.1+t*.01)*curtain*.6;
+  }
+  return col+vec3(.01,.015,.035)*(1.-p.y);}
+// Mandala: twelve-fold petals on breathing rings.
+vec3 s5(vec2 p,float t){
+  vec2 q=kal(rot(t*.02)*p,12.);
+  float r=length(p),br=.5+.5*sin(t*.12);vec3 col=vec3(0);
+  for(int i=0;i<4;i++){
+    float fi=float(i);float R=.12+fi*.13+.015*br;
+    vec2 d=(q-vec2(R,0.))*vec2(1.,2.2+fi*.4);
+    float e=abs(length(d)-.06-.01*fi)-.004;
+    col+=pal(fi*.17+t*.015)*exp(-max(e,0.)*90.)*.6*(1.-fi*.15);
+    float ring=abs(r-R-.07)-.002;
+    col+=pal(fi*.17+.4)*exp(-max(ring,0.)*160.)*.25;
+  }
+  return col+pal(t*.02)*exp(-r*14.)*.4;}
+float sdTri(vec2 p,float r){const float k=1.7320508;p.x=abs(p.x)-r;p.y=p.y+r/k;if(p.x+k*p.y>0.)p=vec2(p.x-k*p.y,-k*p.x-p.y)/2.;p.x-=clamp(p.x,-2.*r,0.);return -length(p)*sign(p.y);}
+// Yantra: interlocking triangles inside rings, turning very slowly.
+vec3 s6(vec2 p,float t){
+  vec3 col=vec3(0);float br=.5+.5*sin(t*.1);
+  for(int i=0;i<5;i++){
+    float fi=float(i);float up=mod(fi,2.)<.5?1.:-1.;
+    vec2 q=rot(t*.01*up)*p;q.y*=up;
+    float d=abs(sdTri(q,.12+fi*.075+.01*br))-.0025;
+    col+=pal(.1+fi*.11+t*.01)*exp(-max(d,0.)*140.)*.55;
+  }
+  float r=length(p);
+  for(int i=0;i<2;i++){float d=abs(r-.52-float(i)*.06)-.002;col+=pal(.6)*exp(-max(d,0.)*150.)*.25;}
+  return col+pal(t*.02+.3)*exp(-r*30.)*.6;}
+// Moiré: two sets of rings whose centers drift apart and back.
+vec3 s7(vec2 p,float t){
+  vec2 c=vec2(.18*sin(t*.023),.12*cos(t*.017));
+  float a=.5+.5*cos(length(p-c)*34.),b=.5+.5*cos(length(p+c)*34.);
+  float r=length(p);
+  return pal(.55+r*.3+t*.01)*pow(a*b,3.)*.5*smoothstep(1.1,.2,r);}
+// Truchet: a quiet field of quarter-circle arcs, slowly drifting.
+vec3 s8(vec2 p,float t){
+  p=rot(.3)*p*4.+vec2(t*.05,t*.03);
+  vec2 id=floor(p),g=fract(p)-.5;
+  if(h21(id)>.5)g.x=-g.x;
+  float d=min(abs(length(g-.5)-.5),abs(length(g+.5)-.5))-.025;
+  return pal(h21(id)*.25+t*.01+p.y*.02)*exp(-max(d,0.)*55.)*.5;}
+// Ember: a dim, warm glow that breathes once every twenty seconds. For eyes-closed sits.
+vec3 s9(vec2 p,float t){
   float r=length(p*vec2(1.,1.15));
   float br=.5+.5*sin(t*.31);
   vec3 warm=vec3(.9,.38,.14);
   float core=exp(-r*r*(5.-1.2*br));
   float haze=fbm(p*1.3+vec2(t*.01,-t*.013))*.35;
   return warm*(core*.42+haze*core*.6)+vec3(.12,.03,.05)*exp(-r*1.2)*.5;}
-vec3 scene(float s,vec2 p,float t){if(s<.5)return s0(p,t);if(s<1.5)return s1(p,t);if(s<2.5)return s2(p,t);if(s<3.5)return s3(p,t);return s4(p,t);}
+vec3 scene(float s,vec2 p,float t){if(s<.5)return s0(p,t);if(s<1.5)return s1(p,t);if(s<2.5)return s2(p,t);if(s<3.5)return s3(p,t);if(s<4.5)return s4(p,t);if(s<5.5)return s5(p,t);if(s<6.5)return s6(p,t);if(s<7.5)return s7(p,t);if(s<8.5)return s8(p,t);return s9(p,t);}
 void main(){
   vec2 p=(gl_FragCoord.xy-.5*R)/min(R.x,R.y);
   p/=1.+.06*sin(T*.21)+bass*.1;p=rot(T*.015)*p;
   vec3 c=scene(sa,p,T);if(mixv>.001)c=mix(c,scene(sb,p,T),mixv);
   c=1.-exp(-c*(1.2+hi*.35));float l=dot(c,vec3(.3,.59,.11));c=max(mix(vec3(l),c,sat),0.);c*=c*.35+.65;c*=(1.-smoothstep(.25,1.5,length(p)));
+  // Breath pacer: a soft ring that grows on the in-breath and shrinks on the out-breath.
+  if(pacer>.001){float b=.5-.5*cos(6.2831853*pacerPhase);float pr=.16+.14*b;float d=abs(length((gl_FragCoord.xy-.5*R)/min(R.x,R.y))-pr);
+    c+=vec3(.95,.82,.62)*exp(-d*55.)*.28*pacer;}
   gl_FragColor=vec4(pow(c,vec3(.95))*fade*bright,1.);
 }`;

@@ -79,7 +79,7 @@ try {
     await shot(q, name);
     if (name === 'visuals-note') {
       await q.click('text=Show visuals');
-      for (const [i, key] of [[0, null], [1, 'ArrowRight'], [2, 'ArrowRight'], [3, 'ArrowRight'], [4, 'e']]) {
+      for (const [i, key] of [[0, null], [1, 'ArrowRight'], [2, 'ArrowRight'], [3, 'ArrowRight'], [4, 'ArrowRight'], [5, 'ArrowRight'], [6, 'ArrowRight'], [7, 'ArrowRight'], [8, 'ArrowRight'], [9, 'e']]) {
         if (key) await q.keyboard.press(key);
         await q.waitForTimeout(key ? 10500 : 4000);
         await q.mouse.move(5 + i, 5);

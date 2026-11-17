@@ -9,7 +9,7 @@
 // - no beat-synced pulsing: the beat frequency is never fed to the picture;
 // - Esc fades to dark at once (over about a second, never a cut).
 
-import { SCENES, FRAG, VERT } from './shader';
+import { EMBER, SCENES, FRAG, VERT } from './shader';
 import { emit, emitTo, listen, currentWindow, isTauri } from '../platform/bridge';
 import { loadSettings, saveSettings, type AppSettings } from '../settings/model';
 import { h } from '../ui/controls';
@@ -83,7 +83,7 @@ if (gl) {
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
   gl.enableVertexAttribArray(0);
   gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-  for (const n of ['R', 'T', 'mixv', 'sa', 'sb', 'bass', 'hi', 'fade', 'bright', 'sat']) U[n] = gl.getUniformLocation(prog, n);
+  for (const n of ['R', 'T', 'mixv', 'sa', 'sb', 'bass', 'hi', 'fade', 'bright', 'sat', 'pacer', 'pacerPhase']) U[n] = gl.getUniformLocation(prog, n);
 }
 
 let quality = 0.7;
@@ -108,9 +108,12 @@ const state = {
   drift: true,
   since: 0,
   dark: false,
+  pacer: false,
+  breathsPerMinute: 5.5,
+  pacerPhase: 0,
 };
 // Smoothed values actually sent to the shader.
-const live = { fade: 0, bright: 0, sat: 1.6, bass: 0, hi: 0, flow: 1 };
+const live = { fade: 0, bright: 0, sat: 1.6, bass: 0, hi: 0, flow: 1, pacer: 0 };
 let frame: Frame = { rms: 0, low: 0, high: 0, phase: 'ready', mode: 'meditate', landing: true };
 let lastFrameAt = 0;
 
@@ -178,8 +181,10 @@ function draw(now: number): void {
       state.mixing = false;
     }
   }
-  // Drift moves through the four main scenes; Ember stays put once chosen.
-  if (state.drift && !state.mixing && state.scene !== 4 && (state.since += dt) > 80) goTo((state.scene + 1) % 4);
+  // Drift moves through the scenes in turn; Ember stays put once chosen.
+  if (state.drift && !state.mixing && state.scene !== EMBER && (state.since += dt) > 80) goTo((state.scene + 1) % EMBER);
+  live.pacer = approach(live.pacer, state.pacer ? 1 : 0, dt, 1.5, 0.5);
+  state.pacerPhase = (state.pacerPhase + (dt * state.breathsPerMinute) / 60) % 1;
 
   // Adapt resolution to keep frame time comfortable.
   acc += dt;
@@ -208,6 +213,8 @@ function draw(now: number): void {
     gl.uniform1f(U.fade, live.fade);
     gl.uniform1f(U.bright, live.bright);
     gl.uniform1f(U.sat, live.sat);
+    gl.uniform1f(U.pacer, live.pacer);
+    gl.uniform1f(U.pacerPhase, state.pacerPhase);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
   requestAnimationFrame(draw);
@@ -216,6 +223,7 @@ function draw(now: number): void {
 // ---------- controls ----------
 
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
+let pacerBtn: HTMLButtonElement | null = null;
 function poke(): void {
   document.body.classList.remove('idle');
   if (idleTimer) clearTimeout(idleTimer);
@@ -264,6 +272,11 @@ function buildBar(): HTMLElement {
     await saveSettings(settings);
     void emit('settings-changed');
   });
+  pacerBtn = h('button', { class: 'btn', 'aria-pressed': 'false', title: 'A ring that grows as you breathe in and shrinks as you breathe out, 5.5 breaths a minute' }, 'Breath pacer');
+  pacerBtn.addEventListener('click', () => {
+    state.pacer = !state.pacer;
+    pacerBtn!.setAttribute('aria-pressed', String(state.pacer));
+  });
   const fs = h('button', { class: 'btn' }, 'Full screen');
   fs.addEventListener('click', () => void toggleFullscreen());
   const close = h('button', { class: 'btn quiet' }, 'Close');
@@ -275,7 +288,7 @@ function buildBar(): HTMLElement {
     h('div', { class: 'grp' }, prev, nameEl, next, drift),
     slider('Flow', 0.2, 2, state.flow, (v) => (state.flow = v)),
     slider('Glow', 0.15, 1.2, state.glow, (v) => (state.glow = v)),
-    h('div', { class: 'grp' }, calm, fs, close),
+    h('div', { class: 'grp' }, pacerBtn, calm, fs, close),
   );
 }
 
@@ -330,7 +343,8 @@ addEventListener('keydown', (e) => {
   if (e.key === 'f' || e.key === 'F') void toggleFullscreen();
   else if (e.key === 'ArrowRight') goTo((state.mixing ? state.next : state.scene) + 1);
   else if (e.key === 'ArrowLeft') goTo((state.mixing ? state.next : state.scene) - 1);
-  else if (e.key === 'e' || e.key === 'E') goTo(4);
+  else if (e.key === 'e' || e.key === 'E') goTo(EMBER);
+  else if (e.key === 'b' || e.key === 'B') pacerBtn?.click();
   else if (e.key === ' ') void emitTo('main', 'remote-action', 'go');
 });
 ['mousemove', 'pointerdown'].forEach((ev) => addEventListener(ev, poke, { passive: true }));
