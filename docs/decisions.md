@@ -211,3 +211,20 @@ needs no microphone permission.
 **Why.** It's the least invasive signal that a call is on. It also triggers
 for dictation or a voice memo, which is fine for a softening, and is why
 it's opt-in.
+
+## 16. The website is plain files, with one script that plays a taste
+
+**Decision.** tonewell.space is the `site` folder: hand-written HTML and
+CSS using the app's own tokens and components, the Figtree font and SVG
+art, served as static files and deployed whenever `main` is pushed. Its
+one script is the "Hear a taste" button, which plays thirty seconds of
+Deep Theta from the app's real engine. `npm run site` builds it from
+`src/site` into `site/assets/js`, and the output is committed, so the
+server never runs a build. The engine is a separate file that loads only
+when the button is pressed. Nothing on the page autoplays.
+
+**Why.** The site keeps the app's own promise: no cookies, no analytics,
+no third-party requests. Plain files keep it that way and keep deploys
+simple. Playing the real engine rather than a recording means the taste
+is the actual sound, with no recording to make or keep in step.
+

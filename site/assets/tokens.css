@@ -1,0 +1,204 @@
+/* Tonewell design tokens: Still Water.
+   Contrast is checked: text >= 4.5:1, --track and --focus-ring >= 3:1 on --surface and --sunken.
+   Theme switches by attribute: data-mode="meditate|focus" and data-phase="ready|playing|winding|resting|ending".
+   Put both on <html> in the app. They also work on any element, so a gallery can show several states side by side. */
+
+@font-face {
+  font-family: 'Figtree';
+  src: url('../fonts/figtree-latin-wght-normal.woff2') format('woff2');
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Figtree';
+  src: url('../fonts/figtree-latin-wght-italic.woff2') format('woff2');
+  font-weight: 300 900;
+  font-style: italic;
+  font-display: block;
+}
+
+:root {
+  color-scheme: dark;
+  --font-sans: 'Figtree', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --fs-micro: 11px;
+  --fs-small: 12.5px;
+  --fs-body: 13px;
+  --fs-ui: 14px;
+  --fs-title: 17px;
+  --fs-name: 21px;
+  --fs-num: 30px;
+  --fs-display: 40px;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-strong: 600;
+  --lh-tight: 1.15;
+  --lh-body: 1.45;
+  --ls-caps: 0.12em;
+  --ls-name: -0.01em;
+  --ls-display: -0.03em;
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+  --s7: 32px;
+  --s8: 40px;
+  --r-chip: 14px;
+  --r-control: 18px;
+  --r-field: 16px;
+  --r-sheet: 24px;
+  --r-window: 30px;
+  --player-w: 380px;
+  --player-h: 156px;
+  --ripple: 112px;
+  --ripple-ring-gap: 9px;
+  --chip-h: 28px;
+  --button-h: 36px;
+  --target-min: 28px;
+  --ease-sound: cubic-bezier(0.3, 0.6, 0.3, 1);
+  --ease-ui: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --t-press: 90ms;
+  --t-ui: 140ms;
+  --t-text: 240ms;
+  --t-sheet: 320ms;
+  --t-material-quiet: 240ms;
+  --t-material-sounding: 8s;
+  --t-notice: 600ms;
+  --shadow-window: 0 20px 44px rgba(0, 0, 0, 0.5);
+  --shadow-pop: 0 16px 36px rgba(0, 0, 0, 0.55);
+  --layer-drone: #DCE3FF;
+  --layer-breath: #C3B6F2;
+  --layer-bells: #E9CF8A;
+  --layer-voices: #F2B5A7;
+  --layer-shimmer: #E4E8FF;
+  --layer-noise: #B8A693;
+  --layer-rain: #84D3E4;
+  --layer-ocean: #7FB3E8;
+  --layer-wind: #B9C6D6;
+  --layer-rise: #D7A8E8;
+  /* Material colour changes follow the sound: 8 s while sounding, quick otherwise. */
+  --t-material: var(--t-material-quiet);
+}
+
+:root,
+[data-mode="meditate"] {
+  /* Meditate: moonlight on night water */
+  --ground: #0E1220;
+  --surface: #12162A;
+  --raised: #1A2040;
+  --sunken: #0C1022;
+  --line: #262C47;
+  --line-2: #2C3458;
+  --track: #6B76A6;
+  --ink: #E9ECF7;
+  --ink-2: #A3AAC6;
+  --ink-3: #9097B2;
+  --accent: #AFC0FF;
+  --accent-hi: #D6DFFF;
+  --accent-wash: #232B55;
+  --on-accent: #0E1220;
+  --focus-ring: #D6DFFF;
+  --accent-rgb: 175, 192, 255;
+  --ring-1: rgba(var(--accent-rgb), 0.16);
+  --ring-2: rgba(var(--accent-rgb), 0.30);
+}
+
+[data-mode="focus"] {
+  /* Focus: the same pool by day, sea glass */
+  --ground: #0B1311;
+  --surface: #0F1A17;
+  --raised: #15241F;
+  --sunken: #0A1411;
+  --line: #213530;
+  --line-2: #27403A;
+  --track: #5E8A7C;
+  --ink: #E6F0EB;
+  --ink-2: #9DB3A9;
+  --ink-3: #8BA398;
+  --accent: #93D9C0;
+  --accent-hi: #C2EEDD;
+  --accent-wash: #183A30;
+  --on-accent: #0C1512;
+  --focus-ring: #C2EEDD;
+  --accent-rgb: 147, 217, 192;
+  --ring-1: rgba(var(--accent-rgb), 0.16);
+  --ring-2: rgba(var(--accent-rgb), 0.30);
+}
+
+[data-phase="winding"],
+[data-phase="resting"],
+[data-phase="ending"] {
+  /* Meditate winding, resting, ending: moonlight cools to dusk */
+  --ground: #120E15;
+  --surface: #17131B;
+  --raised: #221A24;
+  --sunken: #110D13;
+  --line: #33293A;
+  --line-2: #4A3B4C;
+  --track: #86707F;
+  --ink: #F0E8EC;
+  --ink-2: #B5A6B0;
+  --ink-3: #A1929C;
+  --accent: #EBB698;
+  --accent-hi: #F5D2BE;
+  --accent-wash: #3A2830;
+  --on-accent: #1A1218;
+  --focus-ring: #F5D2BE;
+  --accent-rgb: 235, 182, 152;
+  --ring-1: rgba(var(--accent-rgb), 0.16);
+  --ring-2: rgba(var(--accent-rgb), 0.30);
+}
+
+[data-mode="focus"][data-phase="winding"],
+[data-mode="focus"] [data-phase="winding"],
+[data-mode="focus"][data-phase="resting"],
+[data-mode="focus"] [data-phase="resting"],
+[data-mode="focus"][data-phase="ending"],
+[data-mode="focus"] [data-phase="ending"] {
+  /* Focus winding, resting, break, ending: sea glass warms to sand */
+  --ground: #0F120F;
+  --surface: #141714;
+  --raised: #1D211C;
+  --sunken: #0E110E;
+  --line: #2C322A;
+  --line-2: #3F443B;
+  --track: #7D7A66;
+  --ink: #ECE7DA;
+  --ink-2: #B5AE9C;
+  --ink-3: #A39C8A;
+  --accent: #D8C494;
+  --accent-hi: #EADBB4;
+  --accent-wash: #33301F;
+  --on-accent: #17150F;
+  --focus-ring: #EADBB4;
+  --accent-rgb: 216, 196, 148;
+  --ring-1: rgba(var(--accent-rgb), 0.16);
+  --ring-2: rgba(var(--accent-rgb), 0.30);
+}
+
+[data-sounding="true"] {
+  --t-material: var(--t-material-sounding);
+}
+
+@media (prefers-contrast: more) {
+  :root, [data-mode] {
+    --ink-2: var(--ink);
+    --ink-3: color-mix(in srgb, var(--ink) 85%, var(--surface));
+    --line-2: var(--track);
+    --ring-1: rgba(var(--accent-rgb), 0.4);
+    --ring-2: rgba(var(--accent-rgb), 0.7);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --t-ui: 0ms;
+    --t-text: 0ms;
+    --t-sheet: 0ms;
+    --t-notice: 0ms;
+    /* Colour still cross-fades with the sound (it is not motion), but the glow is switched off in components.css. */
+  }
+}

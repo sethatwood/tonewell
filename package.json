@@ -15,7 +15,9 @@
     "tauri": "tauri",
     "perf": "node scripts/audio-perf.mjs",
     "screenshots": "node scripts/screenshots.mjs",
-    "dmg": "sh scripts/make-dmg.sh"
+    "dmg": "sh scripts/make-dmg.sh",
+    "site": "vite build --config vite.site.config.ts",
+    "site:og": "node scripts/site-og.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.5",

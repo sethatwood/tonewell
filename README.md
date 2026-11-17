@@ -6,6 +6,8 @@
 
 <p align="center"><em>A small music box from another realm, for sitting still and for getting things done.</em></p>
 
+<p align="center"><a href="https://tonewell.space">tonewell.space</a></p>
+
 <p align="center">
   <img src="docs/screenshots/mini-playing.png" width="400" alt="The Tonewell mini player during a 20-minute Deep Theta session">
 </p>
@@ -129,6 +131,10 @@ and Linux builds should work but haven't been tried.
 - `src/visuals`, `src/learn` and `src/settings` are the other windows.
 - `src-tauri` is the native shell: menu bar, keep-awake, output watching,
   window lifecycle.
+- `site` is [tonewell.space](https://tonewell.space): static files,
+  deployed when `main` is pushed. Its one script, the "Hear a taste"
+  button, is built from the app's own engine (`src/site`) with
+  `npm run site`, and `npm run site:og` renders its link preview.
 
 The reasoning behind the bigger choices is in
 [docs/decisions.md](docs/decisions.md).
@@ -141,7 +147,9 @@ The reasoning behind the bigger choices is in
   by The Cormorant Project Authors and
   [Atkinson Hyperlegible Next](https://github.com/googlefonts/atkinson-hyperlegible-next)
   by the Braille Institute of America, both under the SIL Open Font License
-  (copies in `src/fonts/`).
+  (copies in `src/fonts/`). The website uses
+  [Figtree](https://github.com/erikdkennedy/figtree) by The Figtree Project
+  Authors, also under the SIL Open Font License (copy in `site/fonts/`).
 - Built with [Tauri](https://tauri.app).
 
 Tonewell isn't affiliated with any meditation organization and doesn't teach
