@@ -12,8 +12,8 @@
 
 Tonewell plays an endless, slowly changing bed of sound: a warm drone that
 wanders between nearby notes, breath-like noise, sparse bells, and optional
-binaural beats, rain, ocean or a plain noise bed. Nothing repeats and nothing
-is recorded. Every sound is made on your Mac as it plays.
+binaural beats, rain, ocean or a plain noise bed. It never plays the same way
+twice, and nothing is recorded: every sound is made on your Mac as it plays.
 
 It was made for one person first: someone with ADHD who meditates twice a
 day and can't do total silence. A continuous, not-quite-musical sound gives
@@ -115,9 +115,9 @@ npm run screenshots     # regenerates the screenshots above
 the sound by ear.
 
 macOS (Apple Silicon) is the first target. The code is cross-platform Tauri,
-with the macOS-only parts (output-device watching, the menu-bar template
-icon) behind platform checks, so Windows and Linux builds should work but
-haven't been tried.
+with the macOS-only parts (output and microphone watching, media keys and
+headphone buttons, the animated resize) behind platform checks, so Windows
+and Linux builds should work but haven't been tried.
 
 ## How it's put together
 
