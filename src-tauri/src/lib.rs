@@ -156,6 +156,24 @@ fn resize_player(window: tauri::WebviewWindow, height: f64, animate: bool) -> Re
     }
 }
 
+/// Show or hide the Dock icon. Hidden, Tonewell lives only in the menu bar.
+#[tauri::command]
+fn set_dock_visible(app: AppHandle, visible: bool) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        app.set_dock_visibility(visible).map_err(|e| e.to_string())?;
+        // Keep the mini player in front after the switch.
+        if let Some(w) = app.get_webview_window("main") {
+            if w.is_visible().unwrap_or(false) {
+                let _ = w.set_focus();
+            }
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = (app, visible);
+    Ok(())
+}
+
 #[tauri::command]
 fn audio_output() -> Option<output::OutputInfo> {
     output::current()
@@ -230,7 +248,7 @@ pub fn run() {
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_opener::init())
         .manage(Awake::default())
-        .invoke_handler(tauri::generate_handler![tray_update, set_keep_awake, audio_output, media_state, resize_player, quit_now, debug_flags, debug_log])
+        .invoke_handler(tauri::generate_handler![tray_update, set_keep_awake, audio_output, media_state, resize_player, set_dock_visible, quit_now, debug_flags, debug_log])
         .setup(|app| {
             let handle = app.handle().clone();
             let start = build_menu(

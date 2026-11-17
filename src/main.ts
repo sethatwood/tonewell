@@ -165,6 +165,7 @@ async function applySettings(next: AppSettings, save = false): Promise<void> {
   if (prev?.folded !== settings.folded) await resize();
   if (isTauri && registeredShortcuts !== settings.shortcutsEnabled) await setShortcuts(settings.shortcutsEnabled);
   session.setDucked(micBusy && settings.softenForCalls);
+  if (isTauri && prev?.showInDock !== settings.showInDock) void invoke('set_dock_visible', { visible: settings.showInDock }).catch(() => undefined);
   void updateTray(session, session.snapshot(), { shortcuts: settings.shortcutsEnabled, showTime: settings.showTimeInMenuBar });
 }
 

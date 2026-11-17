@@ -18,6 +18,7 @@ export interface AppSettings {
   visualsPalette: number;
   /** Lower the sound while any app is using a microphone (a call). */
   softenForCalls: boolean;
+  showInDock: boolean;
 }
 
 export const SETTINGS_DEFAULT: AppSettings = {
@@ -34,6 +35,7 @@ export const SETTINGS_DEFAULT: AppSettings = {
   keepLog: true,
   visualsPalette: 0,
   softenForCalls: false,
+  showInDock: true,
 };
 
 /** One finished session, kept only on this Mac. */
