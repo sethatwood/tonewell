@@ -14,7 +14,7 @@ interface Vowel {
   g: [number, number, number];
 }
 
-// Formant centres in Hz (adult averages) and relative levels.
+// Formant centers in Hz (adult averages) and relative levels.
 export const VOWELS: Record<string, Vowel> = {
   oo: { f: [300, 870, 2240], g: [1, 0.35, 0.08] },
   oh: { f: [500, 900, 2400], g: [1, 0.45, 0.1] },

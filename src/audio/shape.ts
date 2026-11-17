@@ -77,7 +77,7 @@ export function shapeParams(p: SoundParams, o: ShapeOptions): SoundParams {
     }
   }
 
-  // Warmth: an octave warmer to an octave brighter, centred on the preset.
+  // Warmth: an octave warmer to an octave brighter, centered on the preset.
   const w = p.warmth - 0.5;
   const k = Math.pow(2, w * 2);
   e.cutoff = clampParam('cutoff', e.cutoff * k);

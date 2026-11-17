@@ -70,13 +70,13 @@ export class Well {
 
   private bindPointer(): void {
     let start: { x: number; y: number; angle: number; acc: number } | null = null;
-    const centre = () => {
+    const center = () => {
       const r = this.el.getBoundingClientRect();
       return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
     };
     this.el.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
-      const { cx, cy } = centre();
+      const { cx, cy } = center();
       start = { x: e.clientX, y: e.clientY, angle: Math.atan2(e.clientY - cy, e.clientX - cx), acc: 0 };
       this.el.setPointerCapture(e.pointerId);
     });
@@ -85,7 +85,7 @@ export class Well {
       if (!this.winding && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 4) return;
       this.winding = true;
       this.el.classList.add('is-winding');
-      const { cx, cy } = centre();
+      const { cx, cy } = center();
       const a = Math.atan2(e.clientY - cy, e.clientX - cx);
       let d = a - start.angle;
       if (d > Math.PI) d -= Math.PI * 2;

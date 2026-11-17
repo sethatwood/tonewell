@@ -15,7 +15,7 @@ interface Voice {
 }
 
 const PANS = [-1, 1, -0.5, 0.5, 0];
-// StereoPanner at centre is -3 dB per side; this restores the prototype's level.
+// StereoPanner at center is -3 dB per side; this restores the prototype's level.
 const PAN_COMP = Math.SQRT2;
 const DRONE_GAIN = 0.16 / 0.7;
 const SUB_GAIN = 0.24;

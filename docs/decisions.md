@@ -12,7 +12,7 @@ interface later without touching the UI or the session logic.
 
 **Why.** The original prototype's sound was proven in Web Audio, and a
 webview engine is the fastest way to keep that character exactly. The risks
-were timer throttling when the window is hidden and the webview's behaviour
+were timer throttling when the window is hidden and the webview's behavior
 with no visible window. They are handled like this:
 
 - The main window is created with `backgroundThrottling: "disabled"`
@@ -120,7 +120,7 @@ panel) but its surface is opaque.
 
 **Why.** Translucency would let bright windows passing behind an
 always-on-top player change its brightness on their own and lower text
-contrast. The colour tokens are chosen for WCAG AA text contrast and 3:1
+contrast. The color tokens are chosen for WCAG AA text contrast and 3:1
 for control outlines on the opaque grounds.
 
 ## 9. Visuals live in their own window

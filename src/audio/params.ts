@@ -143,7 +143,7 @@ export const PARAMS = {
   driftAmount: range('drift', 'Drift', 0, 1, 0.3, 0.01, { help: 'Lets the filter, breath, bells and space wander slowly on their own.' }),
   driftSpeed: range('drift', 'Drift speed', 0.25, 4, 1, 0.05, { scale: 'log', format: (v) => `${v.toFixed(2)}×` }),
 
-  // Macros shown in the mini player. Both are centred on the preset as designed.
+  // Macros shown in the mini player. Both are centered on the preset as designed.
   warmth: range('macro', 'Warmth', 0, 1, 0.5, 0.01, { format: (v) => macroWord(v, 'warmer', 'brighter'), help: 'Warm at the left, bright at the right. The middle is the preset as designed.' }),
   motion: range('macro', 'Drift', 0, 1, 0.5, 0.01, { format: (v) => macroWord(v, 'stiller', 'wandering'), help: 'Still at the left, wandering at the right: drift, root walk, bells and sweep together.' }),
 } satisfies Record<string, ParamDef>;

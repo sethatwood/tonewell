@@ -21,7 +21,7 @@ export function h<K extends keyof HTMLElementTagNameMap>(
 let uid = 0;
 export const nextId = (prefix: string) => `${prefix}-${++uid}`;
 
-/** Paint the lit part of an engraved scale. Bipolar scales light from the centre. */
+/** Paint the lit part of an engraved scale. Bipolar scales light from the center. */
 export function paintScale(input: HTMLInputElement): void {
   const min = Number(input.min);
   const max = Number(input.max);
@@ -42,7 +42,7 @@ export interface ScaleOptions {
   bipolar?: boolean;
   valueText?: (pos: number) => string;
   onInput: (pos: number) => void;
-  /** Double-click resets a bipolar scale to its centre. */
+  /** Double-click resets a bipolar scale to its center. */
   resetTo?: number;
   step?: number;
   hideLabel?: boolean;
@@ -65,7 +65,7 @@ export function scale(o: ScaleOptions): { el: HTMLElement; input: HTMLInputEleme
   };
   input.addEventListener('input', () => {
     let pos = Number(input.value) / 1000;
-    // A soft detent at the centre of bipolar scales.
+    // A soft detent at the center of bipolar scales.
     if (o.bipolar && Math.abs(pos - 0.5) < 0.025) {
       pos = 0.5;
       input.value = '500';

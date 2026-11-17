@@ -37,7 +37,7 @@ hours of unobtrusive sound alongside your other apps.
   theta beat that glides down from alpha. Focus is steadier: noise beds,
   rain, a still drone, no bells, no beat unless you ask.
 - **Two knobs that matter.** Warmth (warm to bright) and Drift (still to
-  wandering), both centred on the preset as designed. Everything else is
+  wandering), both centered on the preset as designed. Everything else is
   one click away in the panel: every layer, the beat, the session.
 - **Honest about binaural beats.** The Learn window explains what they
   are, what the research does and doesn't show, and where folklore like

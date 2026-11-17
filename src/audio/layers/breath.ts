@@ -1,4 +1,4 @@
-// Breath: pink noise through a band-pass whose centre rises and falls slowly,
+// Breath: pink noise through a band-pass whose center rises and falls slowly,
 // like air moving. The noise buffer is long and decorrelated per ear.
 
 import type { SoundParams } from '../params';
