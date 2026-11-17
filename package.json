@@ -12,7 +12,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:audio": "node scripts/audio-check.mjs",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "perf": "node scripts/audio-perf.mjs",
+    "screenshots": "node scripts/screenshots.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.5",

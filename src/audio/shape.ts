@@ -71,7 +71,8 @@ export function shapeParams(p: SoundParams, o: ShapeOptions): SoundParams {
   if (amount > 0) {
     for (const id of PARAM_IDS) {
       const d: ParamDef = PARAMS[id];
-      if (!d.drift) continue;
+      // Something turned all the way down stays down: drift never wakes it.
+      if (!d.drift || e[id] <= d.min) continue;
       e[id] = clampParam(id, applyDrift(id, e[id], amount, driftOffset(id, o.t, p.driftSpeed, o.seed)));
     }
   }

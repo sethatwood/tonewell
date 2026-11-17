@@ -148,7 +148,8 @@ export class WebAudioEngine implements AudioEngine {
     limiter.release.value = 0.25;
     const clip = ctx.createWaveShaper();
     clip.curve = softClipCurve(0.94);
-    clip.oversample = '2x';
+    // Only a safety net: it rarely engages, so oversampling isn't worth its CPU.
+    clip.oversample = 'none';
     this.analyser = ctx.createAnalyser();
     this.analyser.fftSize = 1024;
     this.analyser.smoothingTimeConstant = 0.85;
@@ -413,6 +414,7 @@ export class WebAudioEngine implements AudioEngine {
       this.breath.tick(now);
       this.bells.tick(now);
       this.textures?.tick(now);
+      this.reverb.tick(now);
     }
   }
 

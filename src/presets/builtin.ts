@@ -27,6 +27,7 @@ export const MODE_BASE: Record<Mode, Partial<SoundParams>> = {
     resonance: 2.5,
     driftAmount: 0.15,
     reverbMix: 0.45,
+    reverbSize: 1,
     noiseOn: 1,
     noiseColor: 0,
     noiseLevel: 0.5,
@@ -74,7 +75,7 @@ export const BUILTIN_PRESETS: readonly Preset[] = [
     name: 'Brown Noise Desk',
     mode: 'focus',
     blurb: 'Deep, even brown noise and nothing else. The plainest bed there is.',
-    params: { droneOn: 0, noiseColor: 0, noiseLevel: 0.7, noiseTone: 1400, reverbMix: 0.15 },
+    params: { droneOn: 0, noiseColor: 0, noiseLevel: 0.7, noiseTone: 1400, reverbMix: 0 },
   },
   {
     id: 'warm-drone',

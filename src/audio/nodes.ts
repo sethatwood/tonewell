@@ -50,12 +50,17 @@ export class Gate {
   }
 
   set(level: number, now: number, tau: number, s: Smoother): void {
-    if (level > 0 && !this.connected) {
-      for (const d of this.dests) this.node.connect(d);
-      this.connected = true;
+    if (level > 0) {
+      if (!this.connected) {
+        for (const d of this.dests) this.node.connect(d);
+        this.connected = true;
+      }
+      this.sleepAt = Infinity;
+    } else if (this.connected && this.sleepAt === Infinity) {
+      // Only start the countdown when the level first reaches zero; re-applying zero must not postpone it.
+      this.sleepAt = now + Math.max(0.05, tau) * 9 + 0.5;
     }
     s.set(this.node.gain, level, now, tau);
-    this.sleepAt = level > 0 ? Infinity : now + Math.max(0.05, tau) * 9 + 0.5;
   }
 
   /** Call regularly with the audio clock; disconnects once the fade has finished. */

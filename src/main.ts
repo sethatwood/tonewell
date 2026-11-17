@@ -326,8 +326,9 @@ async function boot(): Promise<void> {
 }
 
 async function diagnostics(): Promise<void> {
-  const flags = await invoke<{ autostart: boolean; hide: boolean; log: boolean }>('debug_flags');
+  const flags = await invoke<{ autostart: boolean; hide: boolean; log: boolean; preset: string | null }>('debug_flags');
   if (!flags) return;
+  if (flags.preset) session.setPreset(flags.preset);
   const log = (line: string) => void invoke('debug_log', { line });
   if (flags.log) {
     let lastWall = Date.now();

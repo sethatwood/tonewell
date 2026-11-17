@@ -1,0 +1,169 @@
+# Architecture decisions
+
+Short records of the choices that shape Tonewell, newest at the bottom.
+Each says what was decided, why, and what would make us revisit it.
+
+## 1. Sound is made with Web Audio in the mini player's webview
+
+**Decision.** The audio engine runs in the main window's webview (WKWebView
+on macOS), behind an `AudioEngine` interface (`src/audio/engine.ts`). A
+native engine (for example `cpal` with `fundsp`) could implement the same
+interface later without touching the UI or the session logic.
+
+**Why.** The original prototype's sound was proven in Web Audio, and a
+webview engine is the fastest way to keep that character exactly. The risks
+were timer throttling when the window is hidden and the webview's behaviour
+with no visible window. They are handled like this:
+
+- The main window is created with `backgroundThrottling: "disabled"`
+  (Tauri 2's switch for WKWebView's inactive scheduling policy). Closing
+  the window only hides it, so the page and its audio keep running.
+- Nothing musical is timed with `setTimeout`. See decision 2.
+- A tiny AudioWorklet (`tw-clock`) posts the audio clock to the page
+  several times a second, as a heartbeat that doesn't depend on page
+  timers; a 250 ms interval is the fallback.
+
+**Evidence so far.** In the built app, with the window hidden, the
+scheduler ran about eight times a second with a longest gap of 0.15 s, and
+the AudioWorklet loaded under the `tauri://` scheme. With the window
+hidden, the WebKit content process used about 1% of one core for Brown
+Noise Desk and about 4% for Deep Theta, the busiest Meditate preset.
+Layers that are off disconnect themselves after their fade, so they cost
+nothing; `npm run perf` reports each layer's cost.
+
+**Revisit if** a 40-minute session with the screen locked glitches or
+drifts, or long Focus sessions use noticeable CPU.
+
+## 2. Musical time lives on the audio clock
+
+**Decision.** Continuous motion (filter sweeps, root glides, beat-frequency
+ramps, fades, the timer's end fade) is written into AudioParam timelines.
+Discrete events (bells, shimmer grains, root steps) are placed up to 8 s
+ahead by a lookahead scheduler that reads `AudioContext.currentTime`.
+
+**Why.** If the page stalls, the sound keeps its shape: sweeps keep
+sweeping, ramps keep ramping and fades still finish. After a long stall the
+scheduler skips the backlog instead of firing it all at once, so a stall
+can thin the bells but never bunch them up. As a last safety net, a timed
+session's final fade is also scheduled on the audio clock when the session
+starts.
+
+## 3. Every sound is generated
+
+**Decision.** There are no recordings. The drone, beats, bells and breath
+are oscillators and filtered noise; rain, ocean, wind, noise beds and the
+Shepard rise are generated sample by sample in an AudioWorklet
+(`src/audio/worklets/processors.js`). The reverb uses a generated
+exponential-decay noise impulse, as in the prototype.
+
+The breath layer loops a 9.7 s buffer of decorrelated pink noise under a
+moving band-pass filter (with the loop seam cross-faded). That's the only
+loop, and it's inaudible as one.
+
+## 4. Safety is in the signal chain, not just the UI
+
+**Decision.** Output goes through: session fade → timer fade → volume →
+limiter (−4 dB, 20:1) → soft clipper (ceiling 0.94) → output.
+
+- Session fades use S-curves; nothing starts or stops abruptly.
+- Volume rises are capped at 12 dB per second and falls at 40 dB per
+  second, however fast the slider moves.
+- Wind down lowers the bed with its own gain stage after the glue
+  compressor, which would otherwise level the drop out.
+- When headphones disappear, the session mutes within 50 ms (the one
+  deliberate fast change, because the alternative is sound from the
+  speakers) and waits to be resumed.
+
+`npm run test:audio` renders the real engine in WebKit and checks these
+properties on every preset.
+
+## 5. No UI framework
+
+**Decision.** Vanilla TypeScript with small DOM helpers. One parameter
+table (`src/audio/params.ts`) defines every control's range, default,
+units, label and help text, and the panel is generated from it.
+
+**Why.** The interface is small, the bundle stays around 30 KB gzipped,
+and there's one source of truth for each parameter.
+
+## 6. One way to stop: Wind down, then End
+
+**Decision.** There is no Pause. Every stop input (the button, Esc, the
+menu-bar item, a global shortcut) walks the same ladder: Playing → Wind
+down → End. Wind down takes about 6 s to a low, warm hum (or to silence,
+Focus's default) and stays there until Resume or End. The play control
+(the well) means start or resume.
+
+**Why.** For a drone, pausing means a sudden silence, which is exactly what
+the main user finds hard. Two stop verbs also force a decision at the
+moment someone least wants one. The ladder makes the gentle path the only
+path. Esc ignores key repeat and needs a second deliberate press at least a
+second later to end.
+
+**Revisit if** Focus users miss a plain pause for calls; Wind down to
+silence is meant to cover that.
+
+## 7. A rest in the hum after the Meditate timer
+
+**Decision.** When a timed Meditate session ends, a single soft bell
+sounds, the sound winds down to the hum, rests for 2 minutes (adjustable,
+or none), then fades out over 20 s.
+
+**Why.** Coming out of a sit slowly, rather than opening your eyes and
+standing straight away, is common advice in mantra meditation.
+
+## 8. The mini player is opaque
+
+**Decision.** The window is shaped (rounded, transparent outside the
+panel) but its surface is opaque.
+
+**Why.** Translucency would let bright windows passing behind an
+always-on-top player change its brightness on their own and lower text
+contrast. The colour tokens are chosen for WCAG AA text contrast and 3:1
+for control outlines on the opaque grounds.
+
+## 9. Visuals live in their own window
+
+**Decision.** Visuals open on demand in a separate window and are the only
+thing that renders continuously. Closing the window destroys it, so with
+no visuals open there is no WebGL context and no animation loop. The mini
+player's only motion is a CSS opacity animation in Meditate (paused when
+the window is hidden), timed to the drone's filter sweep.
+
+Scenes share one fragment shader, chosen by uniform, and cross-fade over
+9 s. Photosensitivity measures: every brightness input is smoothed (time
+constants of 1 s or more) and slew-limited; there's a global brightness
+cap that Calm visuals lowers further; the beat frequency is never fed to
+the picture; Esc fades to dark within about a second; and a note about
+photosensitive epilepsy appears before the first use.
+
+**Revisit when** there are more than about eight scenes: compile one
+program per scene and cross-fade by blending.
+
+## 10. Native touches are behind platform checks
+
+**Decision.** The Rust side owns the menu-bar menu (built from a
+description the page sends), keep-awake (`keepawake` crate), and an
+output-device watcher that polls CoreAudio once a second. macOS-only code
+sits behind `cfg(target_os = "macos")` with harmless fallbacks, so
+Windows and Linux builds should compile and play, untested.
+
+The page decides how the session reacts: if the previous output
+disappeared, it mutes and waits; if the output switched, it dips and fades
+back in over 3 s; if the output is built-in or display speakers, a
+binaural beat plays as a monaural one, since binaural needs headphones.
+
+## 11. Everything stays on the Mac
+
+**Decision.** Settings, presets and session preferences live in one JSON
+file in the app's data folder (Tauri store plugin). There are no accounts,
+no network requests and no analytics. The only links that leave the app
+are Learn's source links, which open in the default browser when clicked.
+
+## 12. Learn cites what it says
+
+**Decision.** Each Learn card lists numbered sources with DOIs or stable
+links, and every factual sentence points to one. Sources were checked by
+opening the record (PubMed via NCBI's E-utilities, Crossref or the
+publisher). Where only an abstract could be read, the card only claims what
+the abstract says, and where evidence is thin the card says so.

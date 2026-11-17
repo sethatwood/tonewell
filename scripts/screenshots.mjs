@@ -35,10 +35,12 @@ try {
   await shot(p, 'mini-ready');
   // Start, then show playing
   await p.click('.well');
+  await p.mouse.move(250, 150);
   await p.waitForTimeout(1500);
   await shot(p, 'mini-playing');
   // Wind down
   await p.click('.stop-btn');
+  await p.mouse.move(250, 150);
   await p.waitForTimeout(7000);
   await shot(p, 'mini-resting');
   await p.keyboard.press('Escape');

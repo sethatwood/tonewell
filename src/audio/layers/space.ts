@@ -2,7 +2,7 @@
 // between two convolvers) and a mid/side stereo width stage.
 
 import type { SoundParams } from '../params';
-import { Smoother, impulse } from '../nodes';
+import { Gate, Smoother, impulse } from '../nodes';
 
 export const ROOM_SECONDS = [2.5, 4, 6, 10];
 const REVERB_GAIN = 1;
@@ -10,6 +10,8 @@ const REVERB_GAIN = 1;
 export class Reverb {
   readonly input: GainNode;
   readonly output: BiquadFilterNode;
+  /** The reverb's exit; when the mix is zero it sleeps, and the convolver stops costing CPU. */
+  private readonly gate: Gate;
   private readonly mix: GainNode;
   private current: { conv: ConvolverNode; gain: GainNode } | null = null;
   private size = -1;
@@ -23,7 +25,9 @@ export class Reverb {
     this.output.type = 'lowpass';
     this.output.frequency.value = 9000;
     this.output.Q.value = 0.5;
-    this.mix.connect(this.output);
+    this.gate = new Gate(ctx, [this.output]);
+    this.gate.node.gain.value = 1;
+    this.mix.connect(this.gate.node);
   }
 
   private load(size: number, now: number, fade: number): void {
@@ -64,6 +68,11 @@ export class Reverb {
     if (e.reverbSize !== this.size) this.load(e.reverbSize, now, this.size < 0 ? 0 : 2.5);
     s.set(this.mix.gain, e.reverbMix * REVERB_GAIN, now, tau);
     s.set(this.output.frequency, e.reverbTone, now, tau);
+    this.gate.set(e.reverbMix > 0.001 ? 1 : 0, now, Math.max(tau, 0.5), s);
+  }
+
+  tick(now: number): void {
+    this.gate.tick(now);
   }
 }
 

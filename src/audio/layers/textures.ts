@@ -46,14 +46,19 @@ export class Textures {
     });
   }
 
+  private readonly sent = new Map<string, number>();
+
   private flag(name: string, on: boolean, now: number): void {
-    const p = this.node.parameters.get(name);
-    if (p) p.setValueAtTime(on ? 1 : 0, now);
+    this.set(name, on ? 1 : 0, now);
   }
 
+  /** Set a worklet parameter, only when it changes, so automation events never pile up. */
   private set(name: string, v: number, now: number): void {
+    if (this.sent.get(name) === v) return;
     const p = this.node.parameters.get(name);
-    if (p) p.setValueAtTime(v, now);
+    if (!p) return;
+    p.setValueAtTime(v, now);
+    this.sent.set(name, v);
   }
 
   apply(e: SoundParams, now: number, tau: number, s: Smoother, rootHz: number): void {
