@@ -10,12 +10,15 @@ pub struct OutputInfo {
     pub name: String,
     /// "headphones", "speakers" or "unknown": a best guess from the transport.
     pub kind: String,
+    /// The system's mute switch for this output.
+    pub muted: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OutputChange {
-    /// "removed" when the previous output disappeared, "switched" otherwise.
+    /// "removed" when the previous output disappeared, "muted" or "unmuted"
+    /// when only the mute switch changed, "switched" otherwise.
     pub change: String,
     pub previous: Option<OutputInfo>,
     pub current: Option<OutputInfo>,
@@ -44,6 +47,7 @@ mod mac {
     const NAME: u32 = fourcc(b"lnam");
     const TRANSPORT: u32 = fourcc(b"tran");
     const DATA_SOURCE: u32 = fourcc(b"ssrc");
+    const MUTE: u32 = fourcc(b"mute");
     const SCOPE_GLOBAL: u32 = fourcc(b"glob");
     const SCOPE_OUTPUT: u32 = fourcc(b"outp");
     const UTF8: u32 = 0x0800_0100;
@@ -74,7 +78,11 @@ mod mac {
     }
 
     fn get_u32(id: u32, selector: u32, scope: u32) -> Option<u32> {
-        let addr = Address { selector, scope, element: 0 };
+        get_u32_at(id, selector, scope, 0)
+    }
+
+    fn get_u32_at(id: u32, selector: u32, scope: u32, element: u32) -> Option<u32> {
+        let addr = Address { selector, scope, element };
         let mut value: u32 = 0;
         let mut size = std::mem::size_of::<u32>() as u32;
         let status = unsafe {
@@ -137,8 +145,16 @@ mod mac {
         }
     }
 
+    /// Muted on the main element, or on the first channel for devices that mute per channel.
+    fn muted(id: u32) -> bool {
+        get_u32_at(id, MUTE, SCOPE_OUTPUT, 0)
+            .or_else(|| get_u32_at(id, MUTE, SCOPE_OUTPUT, 1))
+            .map(|m| m != 0)
+            .unwrap_or(false)
+    }
+
     pub fn info(id: u32) -> OutputInfo {
-        OutputInfo { name: name(id), kind: kind(id).into() }
+        OutputInfo { name: name(id), kind: kind(id).into(), muted: muted(id) }
     }
 }
 
@@ -168,6 +184,20 @@ pub fn watch<F: Fn(OutputChange) + Send + 'static>(on_change: F) {
             let info = id.map(mac::info);
             if id == prev_id && info == prev_info {
                 continue;
+            }
+            // Only the mute switch moved: report that on its own.
+            if id == prev_id {
+                if let (Some(p), Some(n)) = (&prev_info, &info) {
+                    if p.name == n.name && p.kind == n.kind && p.muted != n.muted {
+                        on_change(OutputChange {
+                            change: if n.muted { "muted".into() } else { "unmuted".into() },
+                            previous: prev_info.clone(),
+                            current: info.clone(),
+                        });
+                        prev_info = info;
+                        continue;
+                    }
+                }
             }
             let removed = match (prev_id, id) {
                 (Some(p), Some(n)) if p != n => !mac::devices().contains(&p),
