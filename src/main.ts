@@ -297,6 +297,9 @@ document.addEventListener('visibilitychange', () => root.classList.toggle('windo
 
 // ---------- the visuals feed ----------
 
+/** Each drone chord as the small ratio the Harmonograph draws: fifth, octave, minor third, fourth. */
+const CHORD_RATIOS: Array<[number, number]> = [[3, 2], [2, 1], [6, 5], [4, 3]];
+
 setInterval(() => {
   if (!visualsOpen) return;
   const lv = session.levels();
@@ -306,6 +309,7 @@ setInterval(() => {
     phase: s, mode: session.mode,
     landing: s === 'winding' || s === 'resting' || s === 'ending' || s === 'ready',
     beatHz: session.beatHzNow(), rootHz: session.rootNow(),
+    ratio: CHORD_RATIOS[session.params.voicing] ?? [3, 2],
   });
 }, 50);
 

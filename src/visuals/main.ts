@@ -15,6 +15,8 @@ import { loadSettings, saveSettings, type AppSettings } from '../settings/model'
 import { h } from '../ui/controls';
 
 interface Frame {
+  /** The drone's chord as a small whole-number ratio, for the Harmonograph. */
+  ratio?: [number, number];
   rms: number;
   low: number;
   high: number;
@@ -83,7 +85,7 @@ if (gl) {
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
   gl.enableVertexAttribArray(0);
   gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-  for (const n of ['R', 'T', 'mixv', 'sa', 'sb', 'bass', 'hi', 'fade', 'bright', 'sat', 'pacer', 'pacerPhase', 'palMix', 'palOrig0', 'palOrig1', 'pa0', 'pb0', 'pc0', 'pd0', 'pa1', 'pb1', 'pc1', 'pd1']) U[n] = gl.getUniformLocation(prog, n);
+  for (const n of ['R', 'T', 'mixv', 'sa', 'sb', 'bass', 'hi', 'fade', 'bright', 'sat', 'pacer', 'pacerPhase', 'palMix', 'palOrig0', 'palOrig1', 'ratioA', 'ratioB', 'pa0', 'pb0', 'pc0', 'pd0', 'pa1', 'pb1', 'pc1', 'pd1']) U[n] = gl.getUniformLocation(prog, n);
 }
 
 let quality = 0.7;
@@ -227,6 +229,8 @@ function draw(now: number): void {
     setPalette(0, state.palette);
     setPalette(1, state.nextPalette);
     gl.uniform1f(U.palMix, state.palMix);
+    gl.uniform1f(U.ratioA, frame.ratio?.[0] ?? 3);
+    gl.uniform1f(U.ratioB, frame.ratio?.[1] ?? 2);
     gl.uniform1f(U.pacerPhase, state.pacerPhase);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
