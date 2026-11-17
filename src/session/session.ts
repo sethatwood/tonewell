@@ -108,13 +108,13 @@ export class Session extends EventTarget {
   private inBreak = false;
   private phaseTimer: ReturnType<typeof setTimeout> | null = null;
   private noticeTimer: ReturnType<typeof setTimeout> | null = null;
-  private lastEsc = 0;
+  private lastEsc = -Infinity;
   private lastWall = Date.now();
   private deviceLost: { name: string; at: number } | null = null;
   /** Paused because the output disappeared: timers and breaks are frozen until the person resumes. */
   private pausedForDevice = false;
   private starting = false;
-  private lastGo = 0;
+  private lastGo = -Infinity;
   /** Audio time the current block started (the session start, or the end of the last Focus break). */
   private blockStart = 0;
   /** Audio time a manual wind-down began, so the timer can pause while resting. */
