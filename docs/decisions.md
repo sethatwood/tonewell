@@ -131,8 +131,8 @@ no visuals open there is no WebGL context and no animation loop. The mini
 player's only motion is a CSS opacity animation in Meditate (paused when
 the window is hidden), timed to the drone's filter sweep.
 
-The ten scenes share one fragment shader, chosen by uniform, and
-cross-fade over 9 s. Photosensitivity measures: every brightness input is smoothed (time
+The fifteen scenes share one fragment shader, chosen by uniform, and
+cross-fade over 9 s; palette changes cross-fade over about 4 s. Photosensitivity measures: every brightness input is smoothed (time
 constants of 1 s or more) and slew-limited; there's a global brightness
 cap that Calm visuals lowers further; the beat frequency is never fed to
 the picture; Esc fades to dark within about a second; and a note about
@@ -190,3 +190,14 @@ standard error output, and diagnostics flags (`TONEWELL_AUTOSTART`,
 `TONEWELL_HIDE`, `TONEWELL_LOG`, `TONEWELL_PRESET`, `TONEWELL_OPEN`) let
 automated checks start sessions, hide the window and print the
 scheduler's health. Nothing is sent anywhere.
+
+## 15. Softening for calls asks only whether a microphone is busy
+
+**Decision.** "Soften during calls" (off by default) polls CoreAudio every
+two seconds for any input device that is running somewhere, and lowers the
+volume by about 9 dB while one is. Tonewell never opens a microphone and
+needs no microphone permission.
+
+**Why.** It's the least invasive signal that a call is on. It also triggers
+for dictation or a voice memo, which is fine for a softening, and is why
+it's opt-in.
