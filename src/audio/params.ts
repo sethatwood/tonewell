@@ -22,6 +22,8 @@ export interface ParamDef {
   format?: (v: number) => string;
   /** Short, plain-language help shown under the control. */
   help?: string;
+  /** A Learn card that explains this control. */
+  learn?: string;
 }
 
 const hz = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)} kHz` : `${Math.round(v)} Hz`);
@@ -42,8 +44,8 @@ export const BAND_EDGES = [0.5, 4, 8, 13, 30, 40];
 const toggle = (group: Group, label: string, def: 0 | 1, help?: string): ParamDef => ({
   label, group, kind: 'toggle', min: 0, max: 1, step: 1, def, help,
 });
-const choice = (group: Group, label: string, choices: readonly string[], def = 0, help?: string): ParamDef => ({
-  label, group, kind: 'choice', min: 0, max: choices.length - 1, step: 1, def, choices, help,
+const choice = (group: Group, label: string, choices: readonly string[], def = 0, help?: string, learn?: string): ParamDef => ({
+  label, group, kind: 'choice', min: 0, max: choices.length - 1, step: 1, def, choices, help, learn,
 });
 const range = (
   group: Group, label: string, min: number, max: number, def: number, step: number,
@@ -57,7 +59,7 @@ export const PARAMS = {
   root: range('drone', 'Root', 26, 45, 33, 1, { format: noteName, help: 'The home note the drone wanders from.' }),
   voicing: choice('drone', 'Chord', VOICINGS.map((v) => v.name)),
   justTuning: toggle('drone', 'Just tuning', 0, 'Pure-ratio steps for the wander and the bells. Equal tuning matches a piano.'),
-  a432: toggle('drone', 'A = 432', 0, 'A tuning preference some people like. It has no proven effect.'),
+  a432: { ...toggle('drone', 'A = 432', 0, 'A tuning preference some people like. It has no proven effect.'), learn: 'folklore' },
   edge: range('drone', 'Edge', 0, 1, 1, 0.01, { help: 'Soft and rounded at the left, bright and reedy at the right.' }),
   detune: range('drone', 'Detune', 0, 20, 7, 0.5, { format: (v) => `${v} ct`, help: 'Slow beating between voices.' }),
   droneWidth: range('drone', 'Width', 0, 1, 0.2, 0.01),
@@ -104,7 +106,7 @@ export const PARAMS = {
   echoFeedback: range('bells', 'Echo repeats', 0, 0.75, 0.45, 0.01),
 
   // Voices: a wordless synthesized choir
-  voicesOn: toggle('voices', 'Voices', 0, 'A wordless choir. It never forms words, so it won’t compete with a mantra.'),
+  voicesOn: { ...toggle('voices', 'Voices', 0, 'A wordless choir. It never forms words, so it won’t compete with a mantra.'), learn: 'adhd' },
   voicesLevel: range('voices', 'Level', 0, 1, 0.5, 0.01),
   voicesDensity: range('voices', 'How many', 1, 5, 3, 1, { format: (v) => `${v} ${v === 1 ? 'voice' : 'voices'}` }),
   voicesRegister: range('voices', 'Register', 0, 1, 0.35, 0.01, { format: (v) => (v < 0.25 ? 'low' : v < 0.6 ? 'middle' : 'high') }),
@@ -115,7 +117,7 @@ export const PARAMS = {
   // Textures
   noiseOn: toggle('textures', 'Noise bed', 0),
   noiseLevel: range('textures', 'Level', 0, 1, 0.5, 0.01),
-  noiseColor: choice('textures', 'Color', ['Brown', 'Pink', 'White'], 0),
+  noiseColor: choice('textures', 'Color', ['Brown', 'Pink', 'White'], 0, undefined, 'focus-sound'),
   noiseTone: range('textures', 'Tone', 200, 12000, 2400, 1, { scale: 'log', format: hz, drift: 0.12 }),
   rainOn: toggle('textures', 'Rain', 0),
   rainLevel: range('textures', 'Level', 0, 1, 0.5, 0.01),

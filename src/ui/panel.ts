@@ -189,16 +189,25 @@ export class Panel {
       this.soundRefresher((s) => sw.set(!!s.params[id]));
       const field = h('div', { class: 'field field-switch' }, h('span', { class: 'field-label' }, def.label), sw.el);
       if (def.help) field.append(h('p', { class: 'field-help' }, def.help));
+      if (def.learn) field.append(this.learnLink(def.learn));
       return field;
     }
     if (def.kind === 'choice') {
       const r = radios<number>(def.label, (def.choices ?? []).map((c, i) => ({ value: i, label: c })), this.session.params[id], (v) => this.set(id, v));
       this.soundRefresher((s) => r.set(s.params[id]));
-      return h('div', { class: 'field field-wide' }, h('span', { class: 'field-label' }, def.label), r.el);
+      const field = h('div', { class: 'field field-wide' }, h('span', { class: 'field-label' }, def.label), r.el);
+      if (def.learn) field.append(this.learnLink(def.learn));
+      return field;
     }
     const sc = paramScale(id, this.get(id), this.set);
     this.soundRefresher(() => sc.refresh());
     return h('div', { class: 'field' }, sc.el);
+  }
+
+  private learnLink(card: string): HTMLElement {
+    const a = h('button', { class: 'link' }, 'What is this?');
+    a.addEventListener('click', () => this.openLearn(card));
+    return a;
   }
 
   private rootStepper(): HTMLElement {
