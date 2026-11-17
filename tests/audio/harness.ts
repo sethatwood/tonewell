@@ -225,6 +225,26 @@ async function monauralCheck(out: Result[]): Promise<void> {
   });
 }
 
+async function bedCheck(out: Result[]): Promise<void> {
+  // The visuals listen to the bed before the beat joins it, so a beat alone must leave that tap silent.
+  let bedMax = 0;
+  let outputLowMax = 0;
+  await renderOffline(solo({ beatOn: 1, beatMode: 1, beatHz: 6, carrier: 111, beatLevel: 1 }), {
+    seconds: 4, sampleRate: 48000, workletUrl, fadeIn: 0.2, step: 0.05,
+    script: (engine, t) => {
+      if (t < 1) return;
+      const bed = engine.bedLevels();
+      bedMax = Math.max(bedMax, bed.rms, bed.low, bed.high);
+      outputLowMax = Math.max(outputLowMax, engine.levels().low);
+    },
+  });
+  out.push({
+    name: 'visuals: the beat never reaches the bed they follow',
+    pass: bedMax < 0.05 && outputLowMax > 0.1,
+    detail: { bedMax: bedMax.toFixed(3), outputLowMax: outputLowMax.toFixed(3) },
+  });
+}
+
 async function landingCheck(out: Result[]): Promise<void> {
   const sr = 48000;
   const deep = BUILTIN_PRESETS.find((p) => p.id === 'deep-theta')!;
@@ -424,7 +444,7 @@ async function longRunCheck(out: Result[]): Promise<void> {
 async function run(): Promise<Result[]> {
   const out: Result[] = [];
   const status = document.getElementById('status')!;
-  const steps = [presetChecks, binauralCheck, rampCheck, monauralCheck, landingCheck, volumeCheck, endCheck, disposeCheck, sessionChecks, texturesCheck, longRunCheck];
+  const steps = [presetChecks, binauralCheck, rampCheck, monauralCheck, bedCheck, landingCheck, volumeCheck, endCheck, disposeCheck, sessionChecks, texturesCheck, longRunCheck];
   for (const step of steps) {
     status.textContent = `Running ${step.name}…`;
     try {

@@ -12,6 +12,7 @@
 
 import { EMBER, PALETTES, SCENES } from './shader';
 import { Visuals } from './renderer';
+import { SoundFollower } from './follow';
 import { emitTo, listen, currentWindow, isTauri } from '../platform/bridge';
 import { loadSettings, patchSettings, type AppSettings } from '../settings/model';
 import { h } from '../ui/controls';
@@ -19,9 +20,11 @@ import { h } from '../ui/controls';
 interface Frame {
   /** The drone's chord as a small whole-number ratio, for the Harmonograph. */
   ratio?: [number, number];
+  /** The bed's levels without the beat, on a decibel scale (WebAudioEngine.bedLevels). */
   rms: number;
   low: number;
   high: number;
+  rootHz?: number;
   phase: string;
   mode: string;
   landing: boolean;
@@ -77,6 +80,7 @@ const state = {
 };
 let frame: Frame = { rms: 0, low: 0, high: 0, phase: 'ready', mode: 'meditate', landing: true };
 let lastFrameAt = 0;
+const follower = new SoundFollower();
 
 const nameEl = h('span', { class: 'name', 'aria-live': 'polite' });
 function setName(): void {
@@ -99,15 +103,19 @@ function draw(now: number): void {
   const react = (settings?.audioReactivity ?? 0.4) * (calm ? 0.5 : 1);
   const stale = performance.now() - lastFrameAt > 2000;
   const landing = stale ? false : frame.landing && frame.phase !== 'ready';
+  // Follow how the sound changes while a session is on, never the beat (the frames carry the bed only).
+  const heard = !stale && frame.phase !== 'ready' ? frame : null;
+  const f = follower.update(dt, heard);
   // Soft landing and Calm visuals dim, slow and desaturate.
   vis?.step(dt, {
     fade: state.dark ? 0 : landing ? 0.28 : frame.phase === 'ready' && !stale ? 0.45 : 1,
     dark: state.dark,
     bright: state.glow * cap,
     sat: landing ? 0.5 : calm ? 1.15 : 1.6,
-    flow: state.flow * (landing ? 0.35 : 1) * (calm ? 0.6 : 1),
-    bass: frame.low * react,
-    hi: frame.high * react,
+    flow: state.flow * (landing ? 0.35 : 1) * (calm ? 0.6 : 1) * (1 + 0.5 * f.drive * react),
+    swell: f.swell * react,
+    bloom: f.bloom * react,
+    hue: f.hue * react,
     pacer: state.pacer,
     ratio: frame.ratio,
   });

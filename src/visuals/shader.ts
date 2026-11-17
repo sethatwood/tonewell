@@ -23,13 +23,13 @@ export const PALETTES: Array<{ name: string; abcd: number[] | null }> = [
 export const VERT = `attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}`;
 
 export const FRAG = `precision highp float;
-uniform vec2 R;uniform float T,mixv,sa,sb,bass,hi,fade,bright,sat,pacer,pacerPhase,palMix,palOrig0,palOrig1,ratioA,ratioB;uniform vec3 pa0,pb0,pc0,pd0,pa1,pb1,pc1,pd1;
+uniform vec2 R;uniform float T,mixv,sa,sb,bass,hi,hue,fade,bright,sat,pacer,pacerPhase,palMix,palOrig0,palOrig1,ratioA,ratioB;uniform vec3 pa0,pb0,pc0,pd0,pa1,pb1,pc1,pd1;
 #define TAU 6.2831853
 mat2 rot(float a){float c=cos(a),s=sin(a);return mat2(c,-s,s,c);}
 vec3 palOrig(float t){vec3 a=.5+.5*cos(TAU*(t+vec3(0.,.33,.67)));vec3 b=.5+.5*cos(TAU*(t+vec3(0.,.15,.3)+.55));return mix(a,b,.5+.5*sin(T*.017));}
 vec3 palOne(float t,vec3 a,vec3 b,vec3 c,vec3 d,float o){if(o>.5)return palOrig(t);return clamp(a+b*cos(TAU*(c*t+d)),0.,1.);}
 // Palette changes cross-fade (palMix) so color never jumps.
-vec3 pal(float t){vec3 x=palOne(t,pa0,pb0,pc0,pd0,palOrig0);if(palMix<.001)return x;return mix(x,palOne(t,pa1,pb1,pc1,pd1,palOrig1),palMix);}
+vec3 pal(float t){t+=hue;vec3 x=palOne(t,pa0,pb0,pc0,pd0,palOrig0);if(palMix<.001)return x;return mix(x,palOne(t,pa1,pb1,pc1,pd1,palOrig1),palMix);}
 float h21(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
 float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);}
 float fbm(vec2 p){float v=0.,a=.5;mat2 m=rot(.6);for(int i=0;i<5;i++){v+=a*noise(p);p=m*p*2.03;a*=.5;}return v;}
@@ -191,9 +191,9 @@ vec3 s14(vec2 p,float t){
 vec3 scene(float s,vec2 p,float t){if(s<.5)return s0(p,t);if(s<1.5)return s1(p,t);if(s<2.5)return s2(p,t);if(s<3.5)return s3(p,t);if(s<4.5)return s4(p,t);if(s<5.5)return s5(p,t);if(s<6.5)return s6(p,t);if(s<7.5)return s7(p,t);if(s<8.5)return s8(p,t);if(s<9.5)return s9(p,t);if(s<10.5)return s10(p,t);if(s<11.5)return s11(p,t);if(s<12.5)return s12(p,t);if(s<13.5)return s13(p,t);return s14(p,t);}
 void main(){
   vec2 p=(gl_FragCoord.xy-.5*R)/min(R.x,R.y);
-  p/=1.+.06*sin(T*.21)+bass*.1;p=rot(T*.015)*p;
+  p/=1.+.06*sin(T*.21)+bass*.16;p=rot(T*.015)*p;
   vec3 c=scene(sa,p,T);if(mixv>.001)c=mix(c,scene(sb,p,T),mixv);
-  c=1.-exp(-c*(1.2+hi*.35));float l=dot(c,vec3(.3,.59,.11));c=max(mix(vec3(l),c,sat),0.);c*=c*.35+.65;c*=(1.-smoothstep(.25,1.5,length(p)));
+  c=1.-exp(-c*(1.2+hi*.9));float l=dot(c,vec3(.3,.59,.11));c=max(mix(vec3(l),c,sat),0.);c*=c*.35+.65;c*=(1.-smoothstep(.25,1.5,length(p)));
   // Breath pacer: a soft ring that grows on the in-breath and shrinks on the out-breath.
   if(pacer>.001){float b=.5-.5*cos(6.2831853*pacerPhase);float pr=.16+.14*b;float d=abs(length((gl_FragCoord.xy-.5*R)/min(R.x,R.y))-pr);
     c+=vec3(.95,.82,.62)*exp(-d*55.)*.28*pacer;}

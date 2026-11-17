@@ -46,8 +46,11 @@ hours of unobtrusive sound alongside your other apps.
   432 Hz comes from, with sources you can check.
 - **Optional visuals.** Fifteen slow scenes in their own window, six
   palettes, a breath pacer, brightness that never changes faster than
-  three times a second, and a Calm mode on by default. With no visuals
-  window open, nothing renders.
+  three times a second, and a Calm mode on by default. "Follow the
+  sound" sets how much they respond: the shapes swell with the drone,
+  bells bloom into light, and a new note shifts the colors. The beat
+  never reaches the picture. With no visuals window open, nothing
+  renders.
 - **Kind to work.** Focus presets are steady and barely use the CPU (about
   1% of one core for Brown Noise Desk). Turn on "Soften during calls" and
   the sound dips whenever an app is using a microphone.

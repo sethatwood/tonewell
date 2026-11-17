@@ -2,8 +2,9 @@
 // the breath pacer and the photosensitivity limits. Hosts (the Visuals window,
 // the website) only choose targets. Every value that changes brightness passes
 // through approach() here, with time constants of a second or more and capped
-// rates, so overall brightness can't swing faster than 3 Hz whatever a host
-// asks for. The beat frequency is never an input.
+// rates, and step() clamps its own time step and targets, so overall
+// brightness can't swing faster than 3 Hz whatever a host asks for. The beat
+// frequency is never an input.
 
 import { EMBER, PALETTES, SCENES, FRAG, VERT } from './shader';
 
@@ -17,9 +18,13 @@ export interface Targets {
   sat: number;
   /** Speed of motion; 1 is as designed. */
   flow: number;
-  /** Audio energy, already scaled by reactivity, 0..1. */
-  bass: number;
-  hi: number;
+  // How the sound is changing (see follow.ts), already scaled by "Follow the sound".
+  /** The picture swells and eases with the low end, -1..1. */
+  swell: number;
+  /** Light blooms with bells and shimmer, 0..1. */
+  bloom: number;
+  /** Colors shift with the drone's note, as a fraction of the palette, -0.5..0.5. */
+  hue: number;
   pacer: boolean;
   /** The drone's chord as a small whole-number ratio, for the Harmonograph. */
   ratio?: [number, number];
@@ -27,12 +32,15 @@ export interface Targets {
 
 /** Move `v` toward `target` with time constant `tau`, never faster than `maxRate` per second. */
 export function approach(v: number, target: number, dt: number, tau: number, maxRate: number): number {
+  // A bad number holds the value where it is (or at rest), rather than blanking the picture for good.
+  if (!Number.isFinite(v)) v = 0;
+  if (!Number.isFinite(target)) return v;
   const step = (target - v) * Math.min(1, dt / tau);
   const cap = maxRate * dt;
   return v + Math.max(-cap, Math.min(cap, step));
 }
 
-const UNIFORMS = ['R', 'T', 'mixv', 'sa', 'sb', 'bass', 'hi', 'fade', 'bright', 'sat', 'pacer', 'pacerPhase', 'palMix', 'palOrig0', 'palOrig1', 'ratioA', 'ratioB', 'pa0', 'pb0', 'pc0', 'pd0', 'pa1', 'pb1', 'pc1', 'pd1'];
+const UNIFORMS = ['R', 'T', 'mixv', 'sa', 'sb', 'bass', 'hi', 'hue', 'fade', 'bright', 'sat', 'pacer', 'pacerPhase', 'palMix', 'palOrig0', 'palOrig1', 'ratioA', 'ratioB', 'pa0', 'pb0', 'pc0', 'pd0', 'pa1', 'pb1', 'pc1', 'pd1'];
 /** Seconds a scene cross-fade takes. */
 const MIX_SECONDS = 9;
 
@@ -59,7 +67,7 @@ export class Visuals {
 
   private readonly U: Record<string, WebGLUniformLocation | null> = {};
   /** Smoothed values actually sent to the shader. */
-  private readonly live = { fade: 0, bright: 0, sat: 1.6, bass: 0, hi: 0, flow: 1, pacer: 0 };
+  private readonly live = { fade: 0, bright: 0, sat: 1.6, swell: 0, bloom: 0, hue: 0, flow: 1, pacer: 0 };
   private quality = 0.7;
   private acc = 0;
   private frames = 0;
@@ -142,15 +150,20 @@ export class Visuals {
 
   /** Advance by `dt` seconds toward `t`, and draw. */
   step(dt: number, t: Targets): void {
+    dt = Number.isFinite(dt) ? Math.min(0.1, Math.max(0, dt)) : 0;
     const live = this.live;
     // Fades are slow, except going dark, which takes about a second.
     live.fade = approach(live.fade, t.fade, dt, t.dark ? 0.25 : 2, t.dark ? 1.2 : 0.35);
     live.bright = approach(live.bright, t.bright, dt, 1, 0.3);
     live.sat = approach(live.sat, t.sat, dt, 2, 0.4);
-    live.flow = approach(live.flow, t.flow, dt, 2, 0.6);
-    // Audio reactivity is heavily smoothed (τ ≈ 1.5 s).
-    live.bass = approach(live.bass, t.bass, dt, 1.5, 0.25);
-    live.hi = approach(live.hi, t.hi, dt, 1.5, 0.25);
+    // Never faster than the Flow slider's top, whatever following the sound adds.
+    live.flow = approach(live.flow, Math.min(2, Math.max(0, t.flow)), dt, 2, 0.6);
+    // Following the sound: a swell takes about a second, light blooms and fades over a second or
+    // more, and colors glide to a new note over several seconds. Each is rate-capped, so even a
+    // sudden sound turns into a slow change in the picture.
+    live.swell = approach(live.swell, t.swell, dt, 1.2, 0.6);
+    live.bloom = approach(live.bloom, t.bloom, dt, 1, 0.5);
+    live.hue = approach(live.hue, t.hue, dt, 4, 0.15);
     live.pacer = approach(live.pacer, t.pacer ? 1 : 0, dt, 1.5, 0.5);
 
     this.T += dt * live.flow;
@@ -201,8 +214,9 @@ export class Visuals {
     gl.uniform1f(U.mixv, this.mixv);
     gl.uniform1f(U.sa, this.scene);
     gl.uniform1f(U.sb, this.next);
-    gl.uniform1f(U.bass, live.bass);
-    gl.uniform1f(U.hi, live.hi);
+    gl.uniform1f(U.bass, live.swell);
+    gl.uniform1f(U.hi, live.bloom);
+    gl.uniform1f(U.hue, live.hue);
     gl.uniform1f(U.fade, live.fade);
     gl.uniform1f(U.bright, live.bright);
     gl.uniform1f(U.sat, live.sat);

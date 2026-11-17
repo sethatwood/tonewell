@@ -320,13 +320,14 @@ document.addEventListener('visibilitychange', () => root.classList.toggle('windo
 
 setInterval(() => {
   if (!visualsOpen) return;
-  const lv = session.levels();
+  // The bed without the beat: the beat never reaches the picture.
+  const lv = session.bedLevels();
   const s = session.phase;
   void emitTo('visuals', 'audio-frame', {
     rms: lv.rms, low: lv.low, high: lv.high,
     phase: s, mode: session.mode,
     landing: s === 'winding' || s === 'resting' || s === 'ending' || s === 'ready',
-    beatHz: session.beatHzNow(), rootHz: session.rootNow(),
+    rootHz: session.rootNow(),
     ratio: chordRatio(session.params.voicing),
   });
 }, 50);

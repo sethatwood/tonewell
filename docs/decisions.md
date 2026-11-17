@@ -244,3 +244,28 @@ limits.
 **Why.** The 3 Hz rule should live in one place that no host can skip.
 A second copy for the website would drift from the app's.
 
+## 18. The visuals follow how the sound changes, and never the beat
+
+**Decision.** The visuals listen to the bed before the beat joins it
+(`bedLevels()`, a second analyser on the landing gain), measured in
+decibels from the float spectrum: the drone's range (about 25–300 Hz),
+where bells, voices and rain sit (about 730–2230 Hz), and overall
+loudness.
+`src/visuals/follow.ts` compares each with its own recent average, so
+a swell, a bell or a new note registers even though a drone's level
+hardly moves. The picture swells with the low end, blooms with bells,
+flows faster when the sound grows, and shifts color when the drone
+changes note. Silence, a suspended context or a silent start counts as
+nothing heard, and following eases in over the first seconds of sound,
+so starting or resuming never reads as a sudden swell. "Follow the
+sound" scales all of it, and the renderer's limits smooth and slow
+everything it draws.
+
+**Why.** Following absolute levels showed almost nothing: the output's
+low band sat near the analyser's byte ceiling and the old high band was
+at the noise floor. Measuring after the beat also let two carriers a
+few hertz apart, which pulse at the beat frequency when mixed, into the
+picture (in Night Drone, fourteen times more beat in the output's low
+band than in the bed's). Tapping the bed keeps the beat out by
+construction, not by smoothing.
+

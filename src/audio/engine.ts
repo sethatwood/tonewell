@@ -55,6 +55,13 @@ export interface AudioEngine {
   /** Run the scheduler. Safe to call as often as you like. */
   pump(): void;
   levels(): Levels;
+  /**
+   * The bed's levels before the beat joins it, for the visuals: the beat must never reach the picture.
+   * On a decibel scale, 0 at -100 dB and 1 at 0 dB, so changes read as the ear hears them. At 48 kHz,
+   * `low` is the drone's range (about 25–300 Hz), `high` is where bells, voices and rain sit (about
+   * 730–2230 Hz), and `rms` is the whole spectrum's power, which jitters less than a 21 ms window.
+   */
+  bedLevels(): Levels;
   dispose(): void;
 }
 
@@ -65,6 +72,9 @@ export interface EngineOptions {
   /** Initial volume, 0..1. */
   volume?: number;
 }
+
+/** Decibels to 0..1: -100 dB is 0, 0 dB is 1. */
+const dbUnit = (db: number): number => Math.min(1, Math.max(0, (db + 100) / 100));
 
 const LOOKAHEAD = 8;
 const SHIMMER_GAP = 2.2;
@@ -101,7 +111,9 @@ export class WebAudioEngine implements AudioEngine {
   /** True after silence(): the session gain is known to be 0 even if nothing has rendered since. */
   private silenced = false;
   private analyser!: AnalyserNode;
+  private bedAnalyser!: AnalyserNode;
   private freqBuf = new Uint8Array(512);
+  private dbBuf = new Float32Array(512);
   private timeBuf = new Float32Array(1024);
 
   private bellNext = 0;
@@ -179,6 +191,18 @@ export class WebAudioEngine implements AudioEngine {
     this.landingGain = ctx.createGain();
     this.width.output.connect(glue).connect(this.landingGain).connect(this.fadeGain);
     this.buses.push(dry, glue, this.landingGain, this.width.input, this.width.output, this.reverb.input, this.reverb.output);
+
+    // The visuals listen here, before the beat joins at the session fade. Two tones a few hertz
+    // apart beat in loudness at exactly the beat frequency, so the output's levels would carry it.
+    this.bedAnalyser = ctx.createAnalyser();
+    this.bedAnalyser.fftSize = 1024;
+    this.bedAnalyser.smoothingTimeConstant = 0.5;
+    // A muted path to the output keeps it in the rendered graph alongside everything else.
+    const bedMute = ctx.createGain();
+    bedMute.gain.value = 0;
+    this.landingGain.connect(this.bedAnalyser);
+    this.bedAnalyser.connect(bedMute).connect(ctx.destination);
+    this.buses.push(this.bedAnalyser, bedMute);
 
     this.drone = new Drone(ctx, dry, this.reverb.input);
     this.breath = new Breath(ctx, dry, this.reverb.input, this.seed + 1);
@@ -458,7 +482,20 @@ export class WebAudioEngine implements AudioEngine {
   }
 
   levels(): Levels {
-    const a = this.analyser;
+    return this.measure(this.analyser);
+  }
+
+  bedLevels(): Levels {
+    this.bedAnalyser.getFloatFrequencyData(this.dbBuf);
+    const band = (from: number, to: number): number => {
+      let power = 0;
+      for (let i = from; i < to; i++) power += 10 ** (this.dbBuf[i] / 10);
+      return dbUnit(10 * Math.log10(power / (to - from) + 1e-12));
+    };
+    return { rms: band(1, 512), low: band(1, 7), high: band(16, 48) };
+  }
+
+  private measure(a: AnalyserNode): Levels {
     a.getByteFrequencyData(this.freqBuf);
     a.getFloatTimeDomainData(this.timeBuf);
     let low = 0;
@@ -469,6 +506,7 @@ export class WebAudioEngine implements AudioEngine {
     for (let i = 0; i < this.timeBuf.length; i++) sum += this.timeBuf[i] * this.timeBuf[i];
     return { rms: Math.sqrt(sum / this.timeBuf.length), low: low / 6 / 255, high: high / 140 / 255 };
   }
+
 
   /**
    * Stop everything and detach from the output. After this the engine makes

@@ -821,6 +821,10 @@ export class Session extends EventTarget {
     return this.engine && this.ctx?.state === 'running' ? this.engine.levels() : { rms: 0, low: 0, high: 0 };
   }
 
+  bedLevels() {
+    return this.engine && this.ctx?.state === 'running' ? this.engine.bedLevels() : { rms: 0, low: 0, high: 0 };
+  }
+
   beatHzNow(): number {
     return this.engine?.beatHzNow() ?? this.params.beatHz;
   }
