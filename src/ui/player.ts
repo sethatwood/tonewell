@@ -162,7 +162,7 @@ export class Player {
     this.expandBtn = h('button', { class: 'icon-btn', 'aria-label': 'Show all controls', 'aria-expanded': 'false', title: 'All controls' });
     this.expandBtn.append(icon(ICONS.expand));
     this.expandBtn.addEventListener('click', () => actions.toggleExpanded());
-    const rowA = h('div', { class: 'row-a' }, this.modeRadios.el, h('span', { class: 'spacer' }), visualsBtn, this.expandBtn);
+    const rowA = h('div', { class: 'row-a', 'data-tauri-drag-region': true }, this.modeRadios.el, h('span', { class: 'spacer', 'data-tauri-drag-region': true }), visualsBtn, this.expandBtn);
 
     this.presetName = h('span', { class: 'preset-name voice' });
     this.editedMark = h('span', { class: 'edited-mark' }, 'edited');
@@ -186,9 +186,10 @@ export class Player {
     this.stopBtn = h('button', { class: 'btn stop-btn' }, this.stopText, h('span', { class: 'kbd', 'aria-hidden': 'true' }, 'esc'));
     this.stopBtn.addEventListener('click', () => session.escape());
     this.hint = h('span', { class: 'first-hint' }, 'Headphones on, then start.');
-    const rowC = h('div', { class: 'row-c' }, this.timeBtn, h('span', { class: 'stop-slot' }, this.stopBtn, this.hint));
+    const rowC = h('div', { class: 'row-c', 'data-tauri-drag-region': true }, this.timeBtn, h('span', { class: 'stop-slot', 'data-tauri-drag-region': true }, this.stopBtn, this.hint));
 
-    const content = h('div', { class: 'player-content' }, rowA, this.presetBtn, rowC);
+    // The background of the player is the handle for moving the window.
+    const content = h('div', { class: 'player-content', 'data-tauri-drag-region': true }, rowA, this.presetBtn, rowC);
 
     const s = session.snapshot();
     this.volume = scale({
@@ -217,9 +218,10 @@ export class Player {
     this.messageText = h('p', { class: 'row-d-text' });
     this.messageActions = h('div', { class: 'row-d-actions' });
     this.message = h('div', { class: 'row-d-message', 'aria-live': 'polite' }, this.messageText, this.messageActions);
-    this.rowD = h('div', { class: 'row-d' }, this.controls, this.message);
+    this.controls.setAttribute('data-tauri-drag-region', '');
+    this.rowD = h('div', { class: 'row-d', 'data-tauri-drag-region': true }, this.controls, this.message);
 
-    this.el = h('section', { class: 'player', 'aria-label': 'Tonewell player' }, close, this.well.el, content, this.rowD);
+    this.el = h('section', { class: 'player', 'aria-label': 'Tonewell player', 'data-tauri-drag-region': true }, close, this.well.el, content, this.rowD);
     this.el.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       actions.contextMenu(this.el);

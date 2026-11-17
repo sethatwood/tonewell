@@ -61,6 +61,8 @@ export function trayMenu(session: Session, s: Snapshot, shortcuts: boolean): Men
 }
 
 let lastJson = '';
+/** The last menu-bar update error, for diagnostics. */
+export let trayError: string | null = null;
 
 export async function updateTray(session: Session, s: Snapshot, opts: { shortcuts: boolean; showTime: boolean }): Promise<void> {
   const menu = trayMenu(session, s, opts.shortcuts);
@@ -73,6 +75,8 @@ export async function updateTray(session: Session, s: Snapshot, opts: { shortcut
   try {
     await invoke('tray_update', { menu, icon, title, tooltip });
   } catch (err) {
+    lastJson = '';
+    trayError = String(err);
     console.warn('Tonewell: tray update failed', err);
   }
 }

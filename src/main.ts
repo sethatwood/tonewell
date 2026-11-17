@@ -4,7 +4,7 @@
 import { Session, type Phase } from './session/session';
 import { Player, handleMenuId, type PlayerActions } from './ui/player';
 import { Panel } from './ui/panel';
-import { updateTray } from './ui/tray';
+import { trayError, updateTray } from './ui/tray';
 import { check, item, popup, sep, submenu } from './ui/menu';
 import { h } from './ui/controls';
 import { currentWindow, emitTo, invoke, isTauri, isWindowOpen, listen, openWindow } from './platform/bridge';
@@ -326,16 +326,26 @@ async function boot(): Promise<void> {
 }
 
 async function diagnostics(): Promise<void> {
-  const flags = await invoke<{ autostart: boolean; hide: boolean; log: boolean; preset: string | null }>('debug_flags');
+  const flags = await invoke<{ autostart: boolean; hide: boolean; log: boolean; preset: string | null; open: string | null }>('debug_flags');
   if (!flags) return;
   if (flags.preset) session.setPreset(flags.preset);
+  for (const name of (flags.open ?? '').split(',').filter(Boolean)) {
+    try {
+      if (name === 'expand') await setExpanded(true);
+      else if (name === 'visuals') await openVisuals();
+      else if (name === 'learn') await openLearn();
+      else if (name === 'settings') actions.openSettings();
+    } catch (err) {
+      void invoke('debug_log', { line: `open ${name} failed: ${String(err)}` });
+    }
+  }
   const log = (line: string) => void invoke('debug_log', { line });
   if (flags.log) {
     let lastWall = Date.now();
     setInterval(() => {
       const now = Date.now();
       const lv = session.levels();
-      log(JSON.stringify({ wallGap: now - lastWall, rms: Number(lv.rms.toFixed(4)), ...session.debugInfo() }));
+      log(JSON.stringify({ wallGap: now - lastWall, rms: Number(lv.rms.toFixed(4)), trayError, visualsOpen, ...session.debugInfo() }));
       lastWall = now;
     }, 10000);
   }

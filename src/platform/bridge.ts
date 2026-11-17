@@ -108,3 +108,11 @@ export async function currentWindow() {
   const { getCurrentWindow } = await import('@tauri-apps/api/window');
   return getCurrentWindow();
 }
+
+// Uncaught errors from any window go to the app's log (stderr), where
+// diagnostics runs can see them. Nothing is sent anywhere else.
+if (isTauri) {
+  const report = (msg: string) => void invoke('debug_log', { line: `${location.pathname}: ${msg}` }).catch(() => undefined);
+  addEventListener('error', (e) => report(`${e.message} at ${e.filename}:${e.lineno}`));
+  addEventListener('unhandledrejection', (e) => report(`unhandled: ${String(e.reason)}`));
+}
