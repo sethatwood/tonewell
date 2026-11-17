@@ -42,7 +42,8 @@ vec3 s0(vec2 p,float t){
 vec3 s1(vec2 p,float t){
   p=rot(t*.05)*p;float r=length(p)+1e-3,a=atan(p.y,p.x);
   vec2 u=vec2(a/TAU*8.,log(r)*1.6-t*.28);u.x+=.35*sin(u.y*1.1+t*.2);
-  vec2 g=fract(u)-.5,id=floor(u);float h=h21(id+.5);
+  // Eight cells around: wrap the index so a cell crossing the angle seam hashes the same on both sides.
+  vec2 g=fract(u)-.5,id=floor(u);id.x=mod(id.x,8.);float h=h21(id+.5);
   float d=abs(length(g)-.28-.06*sin(t*.5+h*6.))-.035;float e=abs(max(abs(g.x),abs(g.y))-.47);
   vec3 col=pal(h*.3+u.y*.06+t*.03)*((1.-smoothstep(0.,.05,d))+exp(-max(d,0.)*18.)*.35);
   col+=pal(u.y*.1+.5)*exp(-e*40.)*.45;col*=smoothstep(.0,.35,r);col+=pal(t*.05+.2)*.06/(r+.08);
