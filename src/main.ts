@@ -364,9 +364,10 @@ async function boot(): Promise<void> {
 }
 
 async function diagnostics(): Promise<void> {
-  const flags = await invoke<{ autostart: boolean; hide: boolean; log: boolean; preset: string | null; open: string | null }>('debug_flags');
+  const flags = await invoke<{ autostart: boolean; hide: boolean; log: boolean; preset: string | null; open: string | null; minutes: number | null }>('debug_flags');
   if (!flags) return;
   if (flags.preset) session.setPreset(flags.preset);
+  if (flags.minutes !== null && flags.minutes !== undefined) session.setLength(flags.minutes > 0 ? flags.minutes : null);
   for (const name of (flags.open ?? '').split(',').filter(Boolean)) {
     try {
       if (name === 'expand') await setExpanded(true);

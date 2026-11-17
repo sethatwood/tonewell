@@ -164,7 +164,7 @@ fn audio_output() -> Option<output::OutputInfo> {
 /// Diagnostics for automated checks: TONEWELL_AUTOSTART=1 starts a session at launch,
 /// TONEWELL_HIDE=1 hides the window once it has started, TONEWELL_PRESET picks a preset,
 /// TONEWELL_LOG=1 prints the scheduler's health every ten seconds, TONEWELL_OPEN opens
-/// windows by name (expand, visuals, learn, settings).
+/// windows by name (expand, visuals, learn, settings), TONEWELL_MINUTES sets the session length.
 #[tauri::command]
 fn debug_flags() -> serde_json::Value {
     let on = |k: &str| std::env::var(k).map(|v| v == "1").unwrap_or(false);
@@ -174,6 +174,7 @@ fn debug_flags() -> serde_json::Value {
         "log": on("TONEWELL_LOG"),
         "preset": std::env::var("TONEWELL_PRESET").ok(),
         "open": std::env::var("TONEWELL_OPEN").ok(),
+        "minutes": std::env::var("TONEWELL_MINUTES").ok().and_then(|m| m.parse::<f64>().ok()),
     })
 }
 
