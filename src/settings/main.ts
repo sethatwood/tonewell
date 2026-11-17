@@ -27,6 +27,7 @@ async function boot(): Promise<void> {
 
   const top = switchControl('Keep the mini player on top', s.alwaysOnTop, (on) => void save({ alwaysOnTop: on }), true);
   const time = switchControl('Show minutes left in the menu bar', s.showTimeInMenuBar, (on) => void save({ showTimeInMenuBar: on }), true);
+  const soften = switchControl('Soften during calls', s.softenForCalls, (on) => void save({ softenForCalls: on }), true);
   const login = switchControl('Open at login', false, async (on) => {
     const a = await autostart();
     if (!a) return;
@@ -89,6 +90,7 @@ async function boot(): Promise<void> {
         row('Keep the mini player on top', 'Floats above other windows. Right-click the player for this and for snapping it to a corner.', top.el),
         row('Show minutes left in the menu bar', 'Off by default: a number next to the icon, updated once a minute.', time.el),
         row('Open at login', null, login.el),
+        row('Soften during calls', 'When any app is using a microphone, the sound gets noticeably quieter, then comes back afterwards. Tonewell only checks whether a microphone is in use; it never listens.', soften.el),
       ),
       h('section', {}, h('h2', {}, 'Shortcuts'),
         row('Global shortcuts', 'Control Tonewell from any app. They stay off until you turn them on, so they never clash with your other apps.', shortcuts.el),

@@ -302,9 +302,25 @@ export class Session extends EventTarget {
     this.afterParamChange();
   }
 
+  private ducked = false;
+
+  /** Soften (about −9 dB) while a call is on, and come back up afterwards. */
+  setDucked(on: boolean): void {
+    if (on === this.ducked) return;
+    this.ducked = on;
+    this.engine?.setVolume(this.effectiveVolume());
+    if (on && this.isRunning()) this.setNotice({ text: 'A microphone is in use, so the sound is softer.', ttl: 6 });
+    this.emit();
+  }
+
+  private effectiveVolume(): number {
+    // Volume is perceptual (gain = v²): 0.6 × volume is about 9 dB down.
+    return this.ducked ? this.volume * 0.6 : this.volume;
+  }
+
   setVolume(v: number): void {
     this.volume = Math.min(1, Math.max(0, v));
-    this.engine?.setVolume(this.volume);
+    this.engine?.setVolume(this.effectiveVolume());
     this.persist();
     this.emit();
   }
@@ -383,7 +399,7 @@ export class Session extends EventTarget {
     this.clearPhaseTimer();
     const ctx = await this.ensureContext();
     this.engine?.dispose();
-    this.engine = await WebAudioEngine.create(ctx, this.engineParams(), { workletUrl, volume: this.volume });
+    this.engine = await WebAudioEngine.create(ctx, this.engineParams(), { workletUrl, volume: this.effectiveVolume() });
     const prefs = this.prefs;
     this.startAt = ctx.currentTime;
     this.blockStart = this.startAt;

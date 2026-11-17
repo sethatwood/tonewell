@@ -18,6 +18,7 @@ let settings: AppSettings;
 let expanded = false;
 let visualsOpen = false;
 let lastPhase: Phase = 'ready';
+let micBusy = false;
 
 const HEIGHT = { mini: 184, folded: 128, expanded: 744 };
 
@@ -163,6 +164,7 @@ async function applySettings(next: AppSettings, save = false): Promise<void> {
   if (w && prev?.alwaysOnTop !== settings.alwaysOnTop) await w.setAlwaysOnTop(settings.alwaysOnTop);
   if (prev?.folded !== settings.folded) await resize();
   if (isTauri && registeredShortcuts !== settings.shortcutsEnabled) await setShortcuts(settings.shortcutsEnabled);
+  session.setDucked(micBusy && settings.softenForCalls);
   void updateTray(session, session.snapshot(), { shortcuts: settings.shortcutsEnabled, showTime: settings.showTimeInMenuBar });
 }
 
@@ -334,6 +336,10 @@ async function boot(): Promise<void> {
     }
     await listen<string>('tray-action', (id) => void runAction(id));
     await listen('audio-output', (c) => session.onOutputChange(c as Parameters<Session['onOutputChange']>[0]));
+    await listen<boolean>('mic-in-use', (busy) => {
+      micBusy = busy;
+      session.setDucked(busy && settings.softenForCalls);
+    });
     await listen('quit-requested', async () => {
       await session.quit();
       await flushNow();

@@ -48,6 +48,9 @@ mod mac {
     const TRANSPORT: u32 = fourcc(b"tran");
     const DATA_SOURCE: u32 = fourcc(b"ssrc");
     const MUTE: u32 = fourcc(b"mute");
+    const RUNNING_SOMEWHERE: u32 = fourcc(b"gone");
+    const STREAMS: u32 = fourcc(b"stm#");
+    const SCOPE_INPUT: u32 = fourcc(b"inpt");
     const SCOPE_GLOBAL: u32 = fourcc(b"glob");
     const SCOPE_OUTPUT: u32 = fourcc(b"outp");
     const UTF8: u32 = 0x0800_0100;
@@ -153,6 +156,20 @@ mod mac {
             .unwrap_or(false)
     }
 
+    fn has_input(id: u32) -> bool {
+        let addr = Address { selector: STREAMS, scope: SCOPE_INPUT, element: 0 };
+        let mut size: u32 = 0;
+        let status = unsafe { AudioObjectGetPropertyDataSize(id, &addr, 0, std::ptr::null(), &mut size) };
+        status == 0 && size > 0
+    }
+
+    /// True when any app is recording from any input: the usual sign of a call.
+    pub fn mic_in_use() -> bool {
+        devices()
+            .into_iter()
+            .any(|id| has_input(id) && get_u32(id, RUNNING_SOMEWHERE, SCOPE_GLOBAL).map(|v| v != 0).unwrap_or(false))
+    }
+
     pub fn info(id: u32) -> OutputInfo {
         OutputInfo { name: name(id), kind: kind(id).into(), muted: muted(id) }
     }
@@ -168,6 +185,25 @@ pub fn current() -> Option<OutputInfo> {
     {
         None
     }
+}
+
+/// Polls every two seconds for any microphone in use and calls `on_change(true/false)` when that changes.
+pub fn watch_mic<F: Fn(bool) + Send + 'static>(on_change: F) {
+    #[cfg(target_os = "macos")]
+    std::thread::spawn(move || {
+        let mut prev = mac::mic_in_use();
+        on_change(prev);
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(2000));
+            let now = mac::mic_in_use();
+            if now != prev {
+                on_change(now);
+                prev = now;
+            }
+        }
+    });
+    #[cfg(not(target_os = "macos"))]
+    let _ = on_change;
 }
 
 /// Polls the default output once a second and calls `on_change` when it changes.

@@ -266,6 +266,10 @@ pub fn run() {
             output::watch(move |change| {
                 let _ = watcher.emit_to("main", "audio-output", change);
             });
+            let mic = handle.clone();
+            output::watch_mic(move |busy| {
+                let _ = mic.emit_to("main", "mic-in-use", busy);
+            });
             Ok(())
         })
         .on_window_event(|window, event| {
