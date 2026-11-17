@@ -9,15 +9,21 @@ const REVERB_GAIN = 1;
 
 export class Reverb {
   readonly input: GainNode;
-  readonly output: GainNode;
+  readonly output: BiquadFilterNode;
+  private readonly mix: GainNode;
   private current: { conv: ConvolverNode; gain: GainNode } | null = null;
   private size = -1;
   private seed = 1;
 
   constructor(private readonly ctx: BaseAudioContext) {
     this.input = ctx.createGain();
-    this.output = ctx.createGain();
-    this.output.gain.value = 0.7;
+    this.mix = ctx.createGain();
+    this.mix.gain.value = 0.7;
+    this.output = ctx.createBiquadFilter();
+    this.output.type = 'lowpass';
+    this.output.frequency.value = 9000;
+    this.output.Q.value = 0.5;
+    this.mix.connect(this.output);
   }
 
   private load(size: number, now: number, fade: number): void {
@@ -27,7 +33,7 @@ export class Reverb {
     conv.buffer = impulse(ctx, ROOM_SECONDS[size] ?? 6, 2.6, this.seed++);
     const gain = ctx.createGain();
     gain.gain.value = 0;
-    this.input.connect(conv).connect(gain).connect(this.output);
+    this.input.connect(conv).connect(gain).connect(this.mix);
     if (fade <= 0) {
       gain.gain.value = 1;
     } else {
@@ -56,7 +62,8 @@ export class Reverb {
 
   apply(e: SoundParams, now: number, tau: number, s: Smoother): void {
     if (e.reverbSize !== this.size) this.load(e.reverbSize, now, this.size < 0 ? 0 : 2.5);
-    s.set(this.output.gain, e.reverbMix * REVERB_GAIN, now, tau);
+    s.set(this.mix.gain, e.reverbMix * REVERB_GAIN, now, tau);
+    s.set(this.output.frequency, e.reverbTone, now, tau);
   }
 }
 

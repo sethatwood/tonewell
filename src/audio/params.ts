@@ -14,8 +14,8 @@ export interface ParamDef {
   max: number;
   step: number;
   def: number;
-  /** Slider mapping: 'log' for frequencies and rates. */
-  scale?: 'log';
+  /** Slider mapping: 'log' for frequencies and rates; 'bands' gives each brainwave band equal width. */
+  scale?: 'log' | 'bands';
   choices?: readonly string[];
   /** How far drift may wander, as a fraction of the range (0 or absent: never drifts). */
   drift?: number;
@@ -28,6 +28,16 @@ const hz = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)} kHz` : `${Math.
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 const secs = (v: number) => (v >= 90 ? `${(v / 60).toFixed(1).replace(/\.0$/, '')} min` : `${Math.round(v)} s`);
 const beatHz = (v: number) => `${v < 10 ? v.toFixed(1) : Math.round(v)} Hz ${bandName(v)}`;
+
+function macroWord(v: number, low: string, high: string): string {
+  const d = v - 0.5;
+  if (Math.abs(d) < 0.03) return 'as designed';
+  const amount = Math.abs(d) > 0.35 ? 'much ' : Math.abs(d) > 0.15 ? '' : 'a little ';
+  return amount + (d < 0 ? low : high);
+}
+
+/** Edges of the brainwave bands: delta, theta, alpha, beta, gamma. */
+export const BAND_EDGES = [0.5, 4, 8, 13, 30, 40];
 
 const toggle = (group: Group, label: string, def: 0 | 1, help?: string): ParamDef => ({
   label, group, kind: 'toggle', min: 0, max: 1, step: 1, def, help,
@@ -64,11 +74,12 @@ export const PARAMS = {
   // Beat (binaural, monaural, isochronic)
   beatOn: toggle('beat', 'Beat', 1),
   beatMode: choice('beat', 'Type', ['Binaural', 'Monaural', 'Isochronic']),
-  beatHz: range('beat', 'Beat', 0.5, 40, 6, 0.1, { scale: 'log', format: beatHz }),
+  beatHz: range('beat', 'Beat', 0.5, 40, 6, 0.1, { scale: 'bands', format: beatHz }),
+  carrierTuned: toggle('beat', 'Tuned to the drone', 1, 'The carrier tone sits on a harmonic of the drone instead of clashing with it.'),
   carrier: range('beat', 'Carrier', 100, 400, 111, 1, { format: hz }),
   beatLevel: range('beat', 'Level', 0, 1, 0.5, 0.01),
   rampOn: toggle('beat', 'Glide', 0, 'Start at one beat and glide to another.'),
-  rampFrom: range('beat', 'Start at', 0.5, 40, 10, 0.1, { scale: 'log', format: beatHz }),
+  rampFrom: range('beat', 'Start at', 0.5, 40, 10, 0.1, { scale: 'bands', format: beatHz }),
   rampMin: range('beat', 'Glide over', 1, 30, 8, 1, { format: (v) => `${v} min` }),
   rampReturn: toggle('beat', 'Come back up', 1, 'Glide back to the start beat at the end of a timed session.'),
   returnMin: range('beat', 'Come back over', 1, 10, 3, 1, { format: (v) => `${v} min` }),
@@ -113,6 +124,7 @@ export const PARAMS = {
   // Space
   reverbMix: range('space', 'Reverb', 0, 1, 0.7, 0.01, { drift: 0.12 }),
   reverbSize: choice('space', 'Room', ['Room', 'Hall', 'Cathedral', 'Cavern'], 2),
+  reverbTone: range('space', 'Reverb tone', 1500, 16000, 9000, 10, { scale: 'log', format: hz }),
   width: range('space', 'Stereo width', 0, 1.5, 1, 0.01, { drift: 0.08 }),
   autopan: range('space', 'Slow pan', 0, 1, 0, 0.01),
 
@@ -120,9 +132,9 @@ export const PARAMS = {
   driftAmount: range('drift', 'Drift', 0, 1, 0.3, 0.01, { help: 'Lets the filter, breath, bells and space wander slowly on their own.' }),
   driftSpeed: range('drift', 'Drift speed', 0.25, 4, 1, 0.05, { scale: 'log', format: (v) => `${v.toFixed(2)}×` }),
 
-  // Macros shown in the mini player
-  depth: range('macro', 'Depth', 0, 1, 0.5, 0.01, { help: 'More space and low end at the right; closer and drier at the left.' }),
-  tone: range('macro', 'Tone', 0, 1, 0.5, 0.01, { help: 'Darker at the left, brighter at the right.' }),
+  // Macros shown in the mini player. Both are centred on the preset as designed.
+  warmth: range('macro', 'Warmth', 0, 1, 0.5, 0.01, { format: (v) => macroWord(v, 'warmer', 'brighter'), help: 'Warm at the left, bright at the right. The middle is the preset as designed.' }),
+  motion: range('macro', 'Drift', 0, 1, 0.5, 0.01, { format: (v) => macroWord(v, 'stiller', 'wandering'), help: 'Still at the left, wandering at the right: drift, root walk, bells and sweep together.' }),
 } satisfies Record<string, ParamDef>;
 
 export type ParamId = keyof typeof PARAMS;
@@ -156,6 +168,14 @@ export function mergeParams(base: SoundParams, patch: Partial<Record<string, num
 /** Slider position (0..1) for a value, honoring log scales. */
 export function toSlider(id: ParamId, v: number): number {
   const d: ParamDef = PARAMS[id];
+  if (d.scale === 'bands') {
+    const n = BAND_EDGES.length - 1;
+    for (let i = 0; i < n; i++) {
+      const lo = BAND_EDGES[i];
+      const hi = BAND_EDGES[i + 1];
+      if (v <= hi || i === n - 1) return (i + Math.min(1, Math.max(0, (v - lo) / (hi - lo)))) / n;
+    }
+  }
   if (d.scale === 'log') return Math.log(v / d.min) / Math.log(d.max / d.min);
   return (v - d.min) / (d.max - d.min);
 }
@@ -163,7 +183,15 @@ export function toSlider(id: ParamId, v: number): number {
 export function fromSlider(id: ParamId, s: number): number {
   const d: ParamDef = PARAMS[id];
   const x = Math.min(1, Math.max(0, s));
-  const raw = d.scale === 'log' ? d.min * Math.pow(d.max / d.min, x) : d.min + x * (d.max - d.min);
+  let raw: number;
+  if (d.scale === 'bands') {
+    const n = BAND_EDGES.length - 1;
+    const i = Math.min(n - 1, Math.floor(x * n));
+    const f = x * n - i;
+    raw = BAND_EDGES[i] + f * (BAND_EDGES[i + 1] - BAND_EDGES[i]);
+  } else {
+    raw = d.scale === 'log' ? d.min * Math.pow(d.max / d.min, x) : d.min + x * (d.max - d.min);
+  }
   const stepped = Math.round(raw / d.step) * d.step;
   return clampParam(id, Number(stepped.toFixed(4)));
 }

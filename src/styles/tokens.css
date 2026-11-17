@@ -1,0 +1,119 @@
+/* Tonewell design tokens.
+   Material: a lacquered music box. Meditate is aubergine lacquer with brass
+   inlay; Focus is the same box gone to verdigris; Resting is the brass
+   cooled to ember. Grounds are opaque. Text pairs pass WCAG AA; control
+   outlines (--track) pass 3:1 non-text contrast. */
+
+@font-face {
+  font-family: 'Cormorant Garamond';
+  src: url('../fonts/cormorant-garamond-latin-500-normal.woff2') format('woff2');
+  font-weight: 500;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Cormorant Garamond';
+  src: url('../fonts/cormorant-garamond-latin-600-normal.woff2') format('woff2');
+  font-weight: 600;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  src: url('../fonts/atkinson-hyperlegible-next-latin-wght-normal.woff2') format('woff2');
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  src: url('../fonts/atkinson-hyperlegible-next-latin-wght-italic.woff2') format('woff2');
+  font-weight: 200 800;
+  font-style: italic;
+  font-display: block;
+}
+
+:root {
+  color-scheme: dark;
+  --voice: 'Cormorant Garamond', 'Iowan Old Style', Georgia, serif;
+  --ui: 'Atkinson Hyperlegible Next', -apple-system, system-ui, sans-serif;
+
+  /* Meditate: lacquer and brass */
+  --ground: #1e1124;
+  --raised: #2a1a31;
+  --ink: #efe6d8;
+  --ink-2: #a898ae;
+  --ink-3: #8f7f95;
+  --accent: #d2a85e;
+  --accent-hi: #e4c07a;
+  --accent-lo: #b88c46;
+  --on-accent: #1e1124;
+  --track: #7a6680;
+  --focus: #f2d597;
+  --line: rgba(255, 236, 200, 0.08);
+  --wash: rgba(255, 236, 200, 0.05);
+  --wash-2: rgba(255, 236, 200, 0.09);
+
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --r-chip: 6px;
+  --r-button: 10px;
+  --r-pop: 14px;
+  --r-window: 16px;
+
+  --ease-sound: cubic-bezier(0.3, 0.6, 0.3, 1);
+  --ease-ui: cubic-bezier(0.4, 0, 0.2, 1);
+  --t-ui: 120ms;
+  --t-text: 240ms;
+  /* Material changes follow the sound (mode or preset 8 s) while it plays; otherwise they are quick. */
+  --t-material: 0.24s;
+}
+
+:root[data-sounding='true'] {
+  --t-material: 8s;
+}
+
+:root[data-mode='focus'] {
+  --ground: #10191d;
+  --raised: #18252a;
+  --ink: #e4eee9;
+  --ink-2: #93a6a6;
+  --ink-3: #7a8f90;
+  --accent: #7dbfa8;
+  --accent-hi: #9dd4c0;
+  --accent-lo: #5f9e88;
+  --on-accent: #10191d;
+  --track: #5b7579;
+  --focus: #bfe8d8;
+  --line: rgba(220, 255, 240, 0.07);
+  --wash: rgba(220, 255, 240, 0.05);
+  --wash-2: rgba(220, 255, 240, 0.09);
+}
+
+:root[data-phase='resting'],
+:root[data-phase='winding'] {
+  --ground: #170d1b;
+  --raised: #21142a;
+  --ink: #e6dacb;
+  --ink-2: #a2949f;
+  --ink-3: #8e808c;
+  --accent: #d0915f;
+  --accent-hi: #dca279;
+  --accent-lo: #b0764a;
+  --on-accent: #170d1b;
+  --track: #6e5f70;
+  --focus: #f2d597;
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --ink-2: #cbbfcf;
+    --track: #cbbfcf;
+  }
+  :root[data-mode='focus'] {
+    --ink-2: #b9caca;
+    --track: #b9caca;
+  }
+}

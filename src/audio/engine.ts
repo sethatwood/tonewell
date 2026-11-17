@@ -72,6 +72,8 @@ const FALL_DB_PER_S = 40;
 
 export class WebAudioEngine implements AudioEngine {
   private p: SoundParams = defaultParams();
+  /** The shaped parameters last applied (after macros, drift and landing). */
+  private e: SoundParams = defaultParams();
   private readonly s = new Smoother();
   private readonly random: () => number;
   private readonly seed: number;
@@ -102,6 +104,8 @@ export class WebAudioEngine implements AudioEngine {
   private interval: ReturnType<typeof setInterval> | null = null;
   private clock: AudioWorkletNode | null = null;
   private disposed = false;
+  /** Scheduler health, for diagnostics: how often pump ran and the longest gap between runs. */
+  readonly stats = { pumps: 0, maxGap: 0, bells: 0, worklet: false };
 
   private constructor(readonly ctx: BaseAudioContext, opts: EngineOptions) {
     this.seed = opts.seed ?? Math.floor(Math.random() * 2 ** 31);
@@ -121,6 +125,7 @@ export class WebAudioEngine implements AudioEngine {
       }
     }
     engine.build(params, worklet);
+    engine.stats.worklet = worklet && engine.textures !== null;
     return engine;
   }
 
@@ -182,6 +187,7 @@ export class WebAudioEngine implements AudioEngine {
     this.beat.start(start);
 
     this.p = { ...params };
+    this.e = shapeParams(this.p, { t: 0, seed: this.seed, landing: false });
     this.applyAll(0.01);
 
     this.bellNext = now + 4;
@@ -214,12 +220,20 @@ export class WebAudioEngine implements AudioEngine {
   }
 
   private walkGap(): number {
-    return this.p.walkEvery * (0.8 + this.random() * 0.4);
+    return this.e.walkEvery * (0.8 + this.random() * 0.4);
   }
 
   private applyAll(tau: number): void {
     const now = this.ctx.currentTime;
+    const prev = this.e;
     const e = shapeParams(this.p, { t: now - this.t0, seed: this.seed, landing: this.landing });
+    this.e = e;
+    // Bells already placed ahead were timed for the old density; re-place them if it moved noticeably.
+    if (Math.abs(e.bellsDensity - prev.bellsDensity) / prev.bellsDensity > 0.15) {
+      const from = this.bells.rescheduleFrom(now + 0.05);
+      if (from !== null) this.bellNext = Math.min(this.bellNext, from);
+    }
+    if (e.walkEvery < prev.walkEvery * 0.85) this.walkNext = Math.min(this.walkNext, now + e.walkEvery);
     this.drone.apply(e, now, tau, this.s);
     this.beat.apply(e, now, tau, this.s);
     this.breath.apply(e, now, tau, this.s);
@@ -247,7 +261,6 @@ export class WebAudioEngine implements AudioEngine {
       const from = this.bells.rescheduleShimmerFrom(now + 0.05);
       if (from !== null) this.shimmerNext = Math.min(this.shimmerNext, from);
     }
-    if (prev.walkEvery !== next.walkEvery) this.walkNext = Math.min(this.walkNext, now + next.walkEvery);
     this.applyAll(tau);
     this.pump();
   }
@@ -370,13 +383,18 @@ export class WebAudioEngine implements AudioEngine {
       this.shimmerNext = Math.max(this.shimmerNext, now + 1);
       this.walkNext = Math.max(this.walkNext, now + 2);
     }
+    this.stats.pumps++;
+    this.stats.maxGap = Math.max(this.stats.maxGap, now - this.lastPump);
     this.lastPump = now;
     const horizon = now + LOOKAHEAD;
-    const e = this.landing ? null : this.p;
+    const e = this.landing ? null : this.e;
 
     while (this.bellNext < horizon) {
-      if (e && e.bellsOn && this.bellNext >= now) this.bells.ring(this.bellNext, this.drone.rootAt(this.bellNext), e);
-      this.bellNext += this.bells.nextGap(this.p);
+      if (e && e.bellsOn && this.bellNext >= now) {
+        this.bells.ring(this.bellNext, this.drone.rootAt(this.bellNext), e);
+        this.stats.bells++;
+      }
+      this.bellNext += this.bells.nextGap(this.e);
     }
     while (this.shimmerNext < horizon) {
       if (e && e.shimmerOn && this.shimmerNext >= now) this.bells.shimmer(this.shimmerNext, this.drone.rootAt(this.shimmerNext));

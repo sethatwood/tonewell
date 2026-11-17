@@ -26,7 +26,7 @@ class NoiseVoice {
     this.white = 0;
     this.pink = 0;
   }
-  // Advances all three colours by one sample.
+  // Advances all three colors by one sample.
   step() {
     const w = this.rand();
     this.p0 = 0.99765 * this.p0 + w * 0.099046;

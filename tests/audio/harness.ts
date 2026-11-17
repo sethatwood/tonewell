@@ -142,7 +142,7 @@ function brightness(x: Float32Array, sr: number, split = 600): number {
 
 const SILENT: Partial<SoundParams> = {
   droneOn: 0, breathOn: 0, bellsOn: 0, beatOn: 0, noiseOn: 0, rainOn: 0, oceanOn: 0, windOn: 0,
-  shimmerOn: 0, shepardOn: 0, reverbMix: 0, driftAmount: 0,
+  shimmerOn: 0, shepardOn: 0, reverbMix: 0, driftAmount: 0, carrierTuned: 0,
 };
 
 const solo = (p: Partial<SoundParams>) => mergeParams(mergeParams(defaultParams(), SILENT), p);

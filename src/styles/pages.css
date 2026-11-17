@@ -1,0 +1,234 @@
+/* Learn and Settings: ordinary resizable windows with a hidden title bar. */
+
+body {
+  overflow: hidden;
+}
+
+/* The title bar is transparent; this strip makes it draggable and keeps text clear of the traffic lights. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 28px;
+  -webkit-app-region: drag;
+  z-index: 5;
+}
+
+a {
+  color: var(--ink);
+  text-decoration-color: var(--track);
+  text-underline-offset: 3px;
+}
+a:hover {
+  text-decoration-color: var(--ink);
+}
+
+/* ---------- Learn ---------- */
+
+.learn {
+  height: 100vh;
+  display: grid;
+  grid-template-columns: 220px 1fr;
+}
+.learn-nav {
+  padding: 44px 16px 24px 20px;
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+}
+.learn-title {
+  margin: 0 0 8px;
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+.learn-intro {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+.learn-group {
+  margin: 18px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+.learn-nav ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.learn-nav li a {
+  display: block;
+  padding: 6px 8px;
+  margin: 0 -8px;
+  border-radius: var(--r-chip);
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ink-2);
+  text-decoration: none;
+}
+.learn-nav li a:hover {
+  color: var(--ink);
+  background: var(--wash);
+}
+.learn-nav li a[aria-current='page'] {
+  color: var(--ink);
+  font-weight: 600;
+  background: var(--wash-2);
+}
+.learn-main {
+  overflow-y: auto;
+  padding: 44px 40px 64px;
+}
+.learn-article {
+  max-width: 62ch;
+  outline: none;
+}
+.learn-card-title {
+  margin: 0 0 12px;
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+.learn-lead {
+  margin: 0 0 20px;
+  font-size: 18px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.learn-article p,
+.learn-list {
+  margin: 0 0 14px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: color-mix(in srgb, var(--ink) 88%, var(--ink-2));
+}
+.learn-list {
+  padding-left: 20px;
+}
+.learn-list li {
+  margin-bottom: 4px;
+}
+.learn-article p strong {
+  color: var(--ink);
+}
+.learn-note {
+  padding: 12px 14px;
+  border-radius: var(--r-button);
+  background: var(--wash);
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
+.cite {
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--ink-2);
+  vertical-align: 1px;
+  padding: 0 1px;
+}
+.cite:hover {
+  color: var(--ink);
+}
+.learn-sources-title {
+  margin: 32px 0 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.learn-sources {
+  margin: 0;
+  padding-left: 22px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.learn-sources li {
+  margin-bottom: 8px;
+  border-radius: 4px;
+}
+.learn-sources li:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+}
+.source-link {
+  color: var(--ink);
+  word-break: break-all;
+}
+
+/* ---------- Settings ---------- */
+
+.settings {
+  height: 100vh;
+  overflow-y: auto;
+  padding: 44px 32px 48px;
+  max-width: 640px;
+}
+.settings h1 {
+  margin: 0 0 8px;
+  font-size: 34px;
+  font-weight: 600;
+}
+.settings section {
+  padding: 16px 0 20px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.settings h2 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.settings section > p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  max-width: 60ch;
+}
+.set-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+}
+.set-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.set-label {
+  font-size: 14px;
+}
+.set-help {
+  margin: 0;
+  font-size: 12px !important;
+  line-height: 1.45 !important;
+  color: var(--ink-2);
+  max-width: 52ch;
+}
+.set-scale {
+  max-width: 320px;
+}
+.shortcut-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 14px;
+  margin: 4px 0 6px;
+  font-size: 13px;
+}
+.shortcut-list dt,
+.shortcut-list dd {
+  margin: 0;
+}
+
+.learn-article,
+.learn-nav,
+.settings {
+  font-variant-numeric: proportional-nums;
+}

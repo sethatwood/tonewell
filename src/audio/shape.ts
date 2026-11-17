@@ -3,6 +3,7 @@
 // overrides everything toward a low, warm hum.
 
 import { PARAMS, PARAM_IDS, clampParam, type ParamDef, type ParamId, type SoundParams } from './params';
+import { midiToHz } from './tuning';
 
 /** Stable 32-bit hash of a string, for per-parameter phases. */
 export function hash32(s: string): number {
@@ -47,30 +48,45 @@ function applyDrift(id: ParamId, v: number, amount: number, offset: number): num
   return v + reach * (d.max - d.min);
 }
 
+/** The harmonic of the drone's root that falls between 100 and 200 Hz, for a beat carrier that blends in. */
+export function tunedCarrier(p: SoundParams): number {
+  const root = midiToHz(p.root, p.a432 ? 432 : 440);
+  return root * Math.pow(2, Math.ceil(Math.log2(100 / root)));
+}
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
 export function shapeParams(p: SoundParams, o: ShapeOptions): SoundParams {
   const e = { ...p };
 
-  // Drift
-  if (p.driftAmount > 0) {
+  // Drift macro (labelled "Drift"; stored as motion): -1 still … +1 wandering.
+  const f = (p.motion - 0.5) * 2;
+  const amount = clamp(p.driftAmount * (1 + f) + Math.max(0, f) * 0.2, 0, 1);
+  e.driftAmount = amount;
+  e.walkEvery = clamp(p.walkEvery * Math.pow(2, -f), 20, 300);
+  e.bellsDensity = clamp(p.bellsDensity * Math.pow(2, f * 0.8), 1, 40);
+  e.sweepDepth = clamp(p.sweepDepth * (1 + 0.5 * f), 0, 600);
+
+  // Drift itself
+  if (amount > 0) {
     for (const id of PARAM_IDS) {
       const d: ParamDef = PARAMS[id];
       if (!d.drift) continue;
-      e[id] = clampParam(id, applyDrift(id, p[id], p.driftAmount, driftOffset(id, o.t, p.driftSpeed, o.seed)));
+      e[id] = clampParam(id, applyDrift(id, e[id], amount, driftOffset(id, o.t, p.driftSpeed, o.seed)));
     }
   }
 
-  // Tone: one octave darker to one octave brighter.
-  const k = Math.pow(2, (p.tone - 0.5) * 2);
+  // Warmth: an octave warmer to an octave brighter, centred on the preset.
+  const w = p.warmth - 0.5;
+  const k = Math.pow(2, w * 2);
   e.cutoff = clampParam('cutoff', e.cutoff * k);
   e.breathCenter = clampParam('breathCenter', e.breathCenter * Math.pow(k, 0.7));
   e.noiseTone = clampParam('noiseTone', e.noiseTone * k);
+  e.reverbTone = clampParam('reverbTone', e.reverbTone * k);
+  // Noise color slides continuously (the generator crossfades between colors).
+  e.noiseColor = clamp(p.noiseColor + w, 0, 2);
 
-  // Depth: space and low end.
-  const d = p.depth;
-  e.reverbMix = Math.min(1, e.reverbMix * (0.5 + d));
-  e.sub = Math.min(1, e.sub * (0.6 + 0.8 * d));
-  e.width = clampParam('width', e.width * (0.8 + 0.4 * d));
-  e.echoFeedback = clampParam('echoFeedback', e.echoFeedback * (0.7 + 0.6 * d));
+  if (p.carrierTuned) e.carrier = tunedCarrier(p);
 
   if (o.landing) {
     e.cutoff = Math.min(e.cutoff, 190);
@@ -87,6 +103,7 @@ export function shapeParams(p: SoundParams, o: ShapeOptions): SoundParams {
     e.oceanLevel *= 0.5;
     e.windLevel *= 0.4;
     e.reverbMix *= 0.8;
+    e.reverbTone = Math.min(e.reverbTone, 3000);
     e.sub = Math.min(1, e.sub * 1.15);
     e.droneLevel *= 0.9;
     e.autopan = 0;
