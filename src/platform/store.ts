@@ -36,6 +36,24 @@ export async function loadDoc(): Promise<Doc> {
   } catch (err) {
     console.warn('Tonewell: could not read settings', err);
   }
+  // Early builds kept everything in one 'tonewell' entry: spread it into separate keys once.
+  const legacy = doc.tonewell;
+  if (legacy && typeof legacy === 'object') {
+    delete doc.tonewell;
+    for (const [k, v] of Object.entries(legacy as Doc)) {
+      if (!(k in doc)) {
+        doc[k] = v;
+        dirty.add(k);
+      }
+    }
+    cache = doc;
+    try {
+      if (isTauri) await (await tauriStore()).delete('tonewell');
+    } catch {
+      // Not fatal: the old entry is simply ignored from now on.
+    }
+    await flush();
+  }
   cache = doc;
   return cache;
 }
