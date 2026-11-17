@@ -8,13 +8,26 @@ export const SCENES = [
 ] as const;
 export const EMBER = SCENES.length - 1;
 
+/** Cosine palettes (a + b·cos(2π(c·t + d))). The first is the prototype's own mix. */
+export const PALETTES: Array<{ name: string; abcd: number[] | null }> = [
+  { name: 'Twilight', abcd: null },
+  { name: 'Hearth', abcd: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1, 1, 1, 0, 0.1, 0.2] },
+  { name: 'Sea glass', abcd: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1, 1, 1, 0.3, 0.2, 0.2] },
+  { name: 'Moss', abcd: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1, 1, 0.5, 0.8, 0.9, 0.3] },
+  { name: 'Dusk', abcd: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1, 0.7, 0.4, 0, 0.15, 0.2] },
+  { name: 'Moonlight', abcd: [0.45, 0.46, 0.52, 0.33, 0.34, 0.38, 1, 1, 1, 0, 0.02, 0.06] },
+];
+
 export const VERT = `attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}`;
 
 export const FRAG = `precision highp float;
-uniform vec2 R;uniform float T,mixv,sa,sb,bass,hi,fade,bright,sat,pacer,pacerPhase;
+uniform vec2 R;uniform float T,mixv,sa,sb,bass,hi,fade,bright,sat,pacer,pacerPhase,palMix,palOrig0,palOrig1;uniform vec3 pa0,pb0,pc0,pd0,pa1,pb1,pc1,pd1;
 #define TAU 6.2831853
 mat2 rot(float a){float c=cos(a),s=sin(a);return mat2(c,-s,s,c);}
-vec3 pal(float t){vec3 a=.5+.5*cos(TAU*(t+vec3(0.,.33,.67)));vec3 b=.5+.5*cos(TAU*(t+vec3(0.,.15,.3)+.55));return mix(a,b,.5+.5*sin(T*.017));}
+vec3 palOrig(float t){vec3 a=.5+.5*cos(TAU*(t+vec3(0.,.33,.67)));vec3 b=.5+.5*cos(TAU*(t+vec3(0.,.15,.3)+.55));return mix(a,b,.5+.5*sin(T*.017));}
+vec3 palOne(float t,vec3 a,vec3 b,vec3 c,vec3 d,float o){if(o>.5)return palOrig(t);return clamp(a+b*cos(TAU*(c*t+d)),0.,1.);}
+// Palette changes cross-fade (palMix) so color never jumps.
+vec3 pal(float t){vec3 x=palOne(t,pa0,pb0,pc0,pd0,palOrig0);if(palMix<.001)return x;return mix(x,palOne(t,pa1,pb1,pc1,pd1,palOrig1),palMix);}
 float h21(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
 float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);}
 float fbm(vec2 p){float v=0.,a=.5;mat2 m=rot(.6);for(int i=0;i<5;i++){v+=a*noise(p);p=m*p*2.03;a*=.5;}return v;}

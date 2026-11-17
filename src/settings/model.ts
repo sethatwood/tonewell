@@ -15,6 +15,7 @@ export interface AppSettings {
   visualsWarned: boolean;
   firstRunDone: boolean;
   keepLog: boolean;
+  visualsPalette: number;
 }
 
 export const SETTINGS_DEFAULT: AppSettings = {
@@ -29,6 +30,7 @@ export const SETTINGS_DEFAULT: AppSettings = {
   visualsWarned: false,
   firstRunDone: false,
   keepLog: true,
+  visualsPalette: 0,
 };
 
 /** One finished session, kept only on this Mac. */

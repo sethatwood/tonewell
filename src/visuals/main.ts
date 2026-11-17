@@ -9,7 +9,7 @@
 // - no beat-synced pulsing: the beat frequency is never fed to the picture;
 // - Esc fades to dark at once (over about a second, never a cut).
 
-import { EMBER, SCENES, FRAG, VERT } from './shader';
+import { EMBER, PALETTES, SCENES, FRAG, VERT } from './shader';
 import { emit, emitTo, listen, currentWindow, isTauri } from '../platform/bridge';
 import { loadSettings, saveSettings, type AppSettings } from '../settings/model';
 import { h } from '../ui/controls';
@@ -83,7 +83,7 @@ if (gl) {
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
   gl.enableVertexAttribArray(0);
   gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-  for (const n of ['R', 'T', 'mixv', 'sa', 'sb', 'bass', 'hi', 'fade', 'bright', 'sat', 'pacer', 'pacerPhase']) U[n] = gl.getUniformLocation(prog, n);
+  for (const n of ['R', 'T', 'mixv', 'sa', 'sb', 'bass', 'hi', 'fade', 'bright', 'sat', 'pacer', 'pacerPhase', 'palMix', 'palOrig0', 'palOrig1', 'pa0', 'pb0', 'pc0', 'pd0', 'pa1', 'pb1', 'pc1', 'pd1']) U[n] = gl.getUniformLocation(prog, n);
 }
 
 let quality = 0.7;
@@ -111,6 +111,9 @@ const state = {
   pacer: false,
   breathsPerMinute: 5.5,
   pacerPhase: 0,
+  palette: 0,
+  nextPalette: 0,
+  palMix: 0,
 };
 // Smoothed values actually sent to the shader.
 const live = { fade: 0, bright: 0, sat: 1.6, bass: 0, hi: 0, flow: 1, pacer: 0 };
@@ -184,6 +187,13 @@ function draw(now: number): void {
   // Drift moves through the scenes in turn; Ember stays put once chosen.
   if (state.drift && !state.mixing && state.scene !== EMBER && (state.since += dt) > 80) goTo((state.scene + 1) % EMBER);
   live.pacer = approach(live.pacer, state.pacer ? 1 : 0, dt, 1.5, 0.5);
+  if (state.nextPalette !== state.palette) {
+    state.palMix = Math.min(1, state.palMix + dt / 4);
+    if (state.palMix >= 1) {
+      state.palette = state.nextPalette;
+      state.palMix = 0;
+    }
+  }
   state.pacerPhase = (state.pacerPhase + (dt * state.breathsPerMinute) / 60) % 1;
 
   // Adapt resolution to keep frame time comfortable.
@@ -214,16 +224,41 @@ function draw(now: number): void {
     gl.uniform1f(U.bright, live.bright);
     gl.uniform1f(U.sat, live.sat);
     gl.uniform1f(U.pacer, live.pacer);
+    setPalette(0, state.palette);
+    setPalette(1, state.nextPalette);
+    gl.uniform1f(U.palMix, state.palMix);
     gl.uniform1f(U.pacerPhase, state.pacerPhase);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
   requestAnimationFrame(draw);
 }
 
+function setPalette(slot: 0 | 1, index: number): void {
+  if (!gl) return;
+  const p = PALETTES[index] ?? PALETTES[0];
+  gl.uniform1f(U[`palOrig${slot}`], p.abcd ? 0 : 1);
+  const v = p.abcd ?? [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1, 1, 1, 0, 0.33, 0.67];
+  gl.uniform3f(U[`pa${slot}`], v[0], v[1], v[2]);
+  gl.uniform3f(U[`pb${slot}`], v[3], v[4], v[5]);
+  gl.uniform3f(U[`pc${slot}`], v[6], v[7], v[8]);
+  gl.uniform3f(U[`pd${slot}`], v[9], v[10], v[11]);
+}
+
+/** Choose the next palette; the change cross-fades over about four seconds. */
+function cyclePalette(): void {
+  if (state.nextPalette !== state.palette) return;
+  state.nextPalette = (state.palette + 1) % PALETTES.length;
+  state.palMix = 0;
+  paletteBtn?.replaceChildren(PALETTES[state.nextPalette].name);
+  settings.visualsPalette = state.nextPalette;
+  void saveSettings(settings);
+}
+
 // ---------- controls ----------
 
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
 let pacerBtn: HTMLButtonElement | null = null;
+let paletteBtn: HTMLButtonElement | null = null;
 function poke(): void {
   document.body.classList.remove('idle');
   if (idleTimer) clearTimeout(idleTimer);
@@ -277,6 +312,8 @@ function buildBar(): HTMLElement {
     state.pacer = !state.pacer;
     pacerBtn!.setAttribute('aria-pressed', String(state.pacer));
   });
+  paletteBtn = h('button', { class: 'btn', title: 'Palette (P)' }, PALETTES[state.palette].name);
+  paletteBtn.addEventListener('click', () => cyclePalette());
   const fs = h('button', { class: 'btn' }, 'Full screen');
   fs.addEventListener('click', () => void toggleFullscreen());
   const close = h('button', { class: 'btn quiet' }, 'Close');
@@ -288,7 +325,7 @@ function buildBar(): HTMLElement {
     h('div', { class: 'grp' }, prev, nameEl, next, drift),
     slider('Flow', 0.2, 2, state.flow, (v) => (state.flow = v)),
     slider('Glow', 0.15, 1.2, state.glow, (v) => (state.glow = v)),
-    h('div', { class: 'grp' }, pacerBtn, calm, fs, close),
+    h('div', { class: 'grp' }, paletteBtn, pacerBtn, calm, fs, close),
   );
 }
 
@@ -345,6 +382,7 @@ addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowLeft') goTo((state.mixing ? state.next : state.scene) - 1);
   else if (e.key === 'e' || e.key === 'E') goTo(EMBER);
   else if (e.key === 'b' || e.key === 'B') pacerBtn?.click();
+  else if (e.key === 'p' || e.key === 'P') cyclePalette();
   else if (e.key === ' ') void emitTo('main', 'remote-action', 'go');
 });
 ['mousemove', 'pointerdown'].forEach((ev) => addEventListener(ev, poke, { passive: true }));
@@ -352,6 +390,7 @@ canvas.addEventListener('dblclick', () => void toggleFullscreen());
 
 async function boot(): Promise<void> {
   settings = await loadSettings();
+  state.palette = state.nextPalette = Math.min(PALETTES.length - 1, Math.max(0, settings.visualsPalette ?? 0));
   await listen<Frame>('audio-frame', (f) => {
     frame = f;
     lastFrameAt = performance.now();
