@@ -15,8 +15,10 @@ const VOLUME = 0.55;
 
 export interface Taste {
   stop(): void;
-  /** Loudness and low and high energy now, for the visuals to follow. */
-  levels(): Levels;
+  /** The bed without the beat, for the visuals to follow (WebAudioEngine.bedLevels). */
+  bedLevels(): Levels;
+  /** The drone's root now, in hertz. */
+  rootHz(): number;
   /** The drone's chord, for the Harmonograph. */
   readonly ratio: [number, number];
 }
@@ -44,7 +46,8 @@ export async function play(ctx: AudioContext, onEnd: () => void): Promise<Taste>
 
   return {
     ratio: chordRatio(params.voicing),
-    levels: () => (done ? { rms: 0, low: 0, high: 0 } : engine.levels()),
+    bedLevels: () => (done ? { rms: 0, low: 0, high: 0 } : engine.bedLevels()),
+    rootHz: () => engine.rootNow(),
     stop() {
       if (done) return;
       engine.fade(0, STOP_FADE);

@@ -24,7 +24,7 @@ import { Visuals } from '/src/visuals/renderer.ts';
 import { SCENES } from '/src/visuals/shader.ts';
 const c = document.getElementById('c');
 const v = Visuals.create(c);
-const look = { fade: 1, dark: false, bright: 0.85 * 0.8, sat: 1.6, flow: 0, bass: 0, hi: 0, pacer: false };
+const look = { fade: 1, dark: false, bright: 0.85 * 0.8, sat: 1.6, flow: 0, swell: 0, bloom: 0, hue: 0, pacer: false };
 window.SCENES = [...SCENES];
 window.still = (scene, T, w, h) => {
   v.drift = false;
