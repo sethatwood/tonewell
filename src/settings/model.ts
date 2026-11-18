@@ -23,6 +23,8 @@ export interface AppSettings {
   showInDock: boolean;
   /** Look for a new version once a day and download it in the background. */
   checkUpdates: boolean;
+  /** Learn's reading size, as a multiple of the usual (⌘+ and ⌘− in Learn). */
+  learnScale: number;
 }
 
 export const SETTINGS_DEFAULT: AppSettings = {
@@ -41,6 +43,7 @@ export const SETTINGS_DEFAULT: AppSettings = {
   softenForCalls: false,
   showInDock: true,
   checkUpdates: true,
+  learnScale: 1,
 };
 
 /** One finished session, kept only on this Mac. */

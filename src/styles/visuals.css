@@ -1,0 +1,82 @@
+/* The visuals window: black, with a small floating toolbar in the player's
+   material and one Light panel above it. The toolbar fades out after 3.5 s
+   idle over 1.2 s, and comes back on any movement or key in 240 ms. */
+
+html, body { background: #000; overflow: hidden; cursor: default; }
+canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+body.idle { cursor: none; }
+
+.vis-ui { font-family: var(--font-sans); color: #E9ECF7; }
+
+.vis-bar {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 22px;
+  background: rgba(14, 18, 32, 0.86); border: 1px solid rgba(175, 192, 255, 0.16);
+  opacity: 1; transition: opacity 240ms var(--ease-ui);
+}
+body.idle .vis-bar { opacity: 0; pointer-events: none; transition: opacity 1.2s var(--ease-sound); }
+.vis-bar .icon-btn, .light-panel .icon-btn {
+  width: 32px; height: 32px; border-radius: 50%; border: none; background: transparent; color: #A3AAC6;
+  display: inline-flex; align-items: center; justify-content: center; padding: 0;
+  transition: color var(--t-ui) var(--ease-ui), background-color var(--t-ui) var(--ease-ui);
+}
+.vis-bar .icon-btn:hover { color: #E9ECF7; background: rgba(175, 192, 255, 0.1); }
+.vis-bar .icon-btn[aria-pressed='true'], .vis-bar .icon-btn[aria-expanded='true'] { color: #AFC0FF; background: #232B55; }
+.vis-bar .icon { width: 18px; height: 18px; stroke-width: 1.7; }
+.vis-bar__scene { min-width: 168px; text-align: center; font-size: var(--fs-ui); font-weight: var(--fw-medium); }
+.vis-bar__sep { width: 1px; height: 20px; background: rgba(175, 192, 255, 0.16); margin: 0 4px; }
+
+.light-panel {
+  position: fixed; left: 50%; bottom: 84px; width: 360px; max-width: calc(100% - 24px);
+  transform: translate(-50%, 0); padding: 18px 20px 16px; border-radius: 24px;
+  background: rgba(18, 22, 42, 0.94); border: 1px solid rgba(175, 192, 255, 0.18);
+  display: flex; flex-direction: column; gap: 12px;
+  transition: opacity 240ms var(--ease-ui), transform 240ms var(--ease-ui);
+}
+.light-panel[data-closed] { opacity: 0; transform: translate(-50%, 6px); pointer-events: none; }
+body.idle .light-panel { opacity: 0; pointer-events: none; transition: opacity 1.2s var(--ease-sound); }
+.light-panel__head { display: flex; justify-content: space-between; align-items: baseline; }
+.light-panel__title { margin: 0; font-size: 15px; font-weight: var(--fw-strong); }
+.light-panel__note { font-size: 12px; color: #A3AAC6; }
+.light-panel .field { display: grid; grid-template-columns: 96px minmax(0, 1fr) 56px; align-items: center; gap: 10px; font-size: var(--fs-small); }
+.light-panel .field__value { text-align: right; color: #A3AAC6; font-size: 12px; font-variant-numeric: tabular-nums; }
+.light-panel hr { border: none; border-top: 1px solid rgba(175, 192, 255, 0.14); margin: 2px 0; width: 100%; }
+.light-panel .row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.light-panel .row__text { display: flex; flex-direction: column; gap: 2px; }
+.light-panel .row__label { font-size: var(--fs-small); }
+.light-panel .row__help { font-size: 12px; color: #A3AAC6; line-height: 1.45; }
+.light-panel__foot { margin: 0; font-size: 12px; line-height: 1.5; color: #A3AAC6; }
+
+.light-panel .field--palette { grid-template-columns: 96px minmax(0, 1fr); }
+.swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+.swatch {
+  flex: none; width: 26px; height: 26px; border-radius: 50%; padding: 0; border: 2px solid transparent;
+  background: linear-gradient(135deg, var(--a) 0 50%, var(--b) 50% 100%);
+  box-shadow: 0 0 0 1px rgba(175, 192, 255, 0.18);
+}
+.swatch[aria-checked='true'] { border-color: #E9ECF7; }
+.swatch:focus-visible { outline: 2px solid #D6DFFF; outline-offset: 2px; }
+
+/* First open: nothing renders until "Show visuals". */
+.note { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; background: #000; }
+.dialog {
+  width: min(460px, 100%); border-radius: var(--r-sheet); background: var(--surface); border: 1px solid var(--line-2);
+  padding: 28px 30px 24px; display: flex; flex-direction: column; gap: 14px; box-shadow: var(--shadow-pop);
+}
+.dialog h1 { margin: 0; font-size: 22px; font-weight: var(--fw-strong); line-height: 1.2; color: var(--ink); }
+.dialog p { margin: 0; font-size: var(--fs-ui); line-height: 1.55; color: var(--ink-2); }
+.dialog .check { display: flex; gap: 10px; align-items: flex-start; font-size: var(--fs-ui); line-height: 1.5; color: var(--ink); }
+.dialog .check input { width: 16px; height: 16px; accent-color: var(--accent); margin: 3px 0 0; }
+.dialog__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.dialog .btn {
+  height: var(--button-h); border-radius: 18px; padding: 0 18px; border: 1px solid var(--line-2); background: transparent;
+  color: var(--ink); font-size: var(--fs-body); font-weight: var(--fw-medium);
+}
+.dialog .btn--primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: var(--fw-strong); }
+
+/* After Esc: the picture fades to black; this line comes in after 2 s, only if you're still looking. */
+.dark-hint {
+  position: fixed; left: 50%; bottom: 72px; transform: translateX(-50%); margin: 0;
+  color: #6F7590; font-size: 13px; text-align: center; opacity: 0; transition: opacity 600ms var(--ease-out);
+}
+body.dark .dark-hint { opacity: 1; transition-delay: 2s; }

@@ -59,6 +59,8 @@ export class Visuals {
   since = 0;
   palette = 0;
   nextPalette = 0;
+  /** A palette chosen while another cross-fade ran: it follows when that one ends. */
+  private queuedPalette: number | null = null;
   palMix = 0;
   breathsPerMinute = 5.5;
   pacerPhase = 0;
@@ -140,12 +142,32 @@ export class Visuals {
     this.onScene?.();
   }
 
-  /** Start the cross-fade to the next palette, over about four seconds. Returns its index, or null while one is running. */
+  /** The palette it will settle on, once any cross-fade under way (and any queued) has run. */
+  targetPalette(): number {
+    return this.queuedPalette ?? this.nextPalette;
+  }
+
+  /** Cross-fade to the palette after the one it's heading for. Returns its index. */
   cyclePalette(): number | null {
-    if (this.nextPalette !== this.palette) return null;
-    this.nextPalette = (this.palette + 1) % PALETTES.length;
-    this.palMix = 0;
-    return this.nextPalette;
+    return this.choosePalette((this.targetPalette() + 1) % PALETTES.length);
+  }
+
+  /**
+   * Cross-fade to one palette, over about four seconds. If another cross-fade
+   * is under way, this one follows when it ends (colour never jumps). Returns
+   * the palette it will settle on, or null if the index isn't one.
+   */
+  choosePalette(index: number): number | null {
+    if (index < 0 || index >= PALETTES.length) return null;
+    if (this.nextPalette !== this.palette) {
+      this.queuedPalette = index === this.nextPalette ? null : index;
+      return index;
+    }
+    if (index !== this.palette) {
+      this.nextPalette = index;
+      this.palMix = 0;
+    }
+    return index;
   }
 
   /** Advance by `dt` seconds toward `t`, and draw. */
@@ -187,6 +209,10 @@ export class Visuals {
       if (this.palMix >= 1) {
         this.palette = this.nextPalette;
         this.palMix = 0;
+        if (this.queuedPalette !== null) {
+          if (this.queuedPalette !== this.palette) this.nextPalette = this.queuedPalette;
+          this.queuedPalette = null;
+        }
       }
     }
     this.pacerPhase = (this.pacerPhase + (dt * this.breathsPerMinute) / 60) % 1;

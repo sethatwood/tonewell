@@ -88,7 +88,7 @@ export async function openWindow(spec: WindowSpec): Promise<void> {
     minHeight: spec.minHeight,
     resizable: spec.resizable ?? true,
     center: true,
-    backgroundColor: spec.background ?? '#1e1124',
+    backgroundColor: spec.background ?? '#0E1220',
     titleBarStyle: 'overlay',
     hiddenTitle: true,
   });
@@ -110,13 +110,16 @@ export async function currentWindow() {
   return getCurrentWindow();
 }
 
-// Secondary windows have a transparent title bar: give them a strip to drag by.
+// Secondary windows have a transparent title bar: give them a strip to drag by,
+// unless the page draws its own (Learn and Settings do, with the window's name).
 if (isTauri && typeof document !== 'undefined' && !location.pathname.endsWith('index.html') && location.pathname !== '/') {
   const strip = document.createElement('div');
   strip.className = 'drag-strip';
   strip.setAttribute('data-tauri-drag-region', '');
   strip.style.cssText = 'position:fixed;inset:0 0 auto 0;height:28px;z-index:5';
-  addEventListener('DOMContentLoaded', () => document.body.prepend(strip));
+  addEventListener('DOMContentLoaded', () => {
+    if (!document.querySelector('.win-strip')) document.body.prepend(strip);
+  });
 }
 
 // WebKit's own right-click menu offers Reload, which would end a session abruptly.

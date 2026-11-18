@@ -10,12 +10,14 @@
 // - no beat-synced pulsing: the beat frequency is never fed to the picture;
 // - Esc fades to dark at once (over about a second, never a cut).
 
+import '../styles/visuals.css';
 import { EMBER, PALETTES, SCENES } from './shader';
 import { Visuals } from './renderer';
 import { SoundFollower } from './follow';
 import { emitTo, listen, currentWindow, isTauri } from '../platform/bridge';
 import { loadSettings, patchSettings, type AppSettings } from '../settings/model';
 import { h } from '../ui/controls';
+import { uiIcon, type UiIcon } from '../ui/icons';
 import { computer } from '../platform/os';
 
 interface Frame {
@@ -34,39 +36,10 @@ interface Frame {
 const doc = document.documentElement;
 doc.dataset.mode = 'meditate';
 document.title = 'Tonewell Visuals';
-const style = document.createElement('style');
-style.textContent = `
-html,body{background:#000;overflow:hidden;cursor:default}
-canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
-.bar{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;justify-content:center;
-  width:min(880px,calc(100% - 24px));padding:10px 14px;background:rgba(18,10,22,.78);border-radius:var(--r-pop);box-shadow:0 0 0 1px var(--line);
-  transition:opacity .9s var(--ease-ui),transform .9s var(--ease-ui)}
-body.idle .bar{opacity:0;transform:translate(-50%,10px);pointer-events:none}
-body.idle{cursor:none}
-.bar .grp{display:flex;align-items:center;gap:6px}
-.bar .name{min-width:9.5em;text-align:center;font:600 20px var(--voice)}
-.bar label{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-2)}
-.bar .scale{width:96px}
-.bar .btn{min-height:30px}
-.bar .btn[aria-pressed='true']{border-color:var(--accent)}
-.note{position:fixed;inset:0;display:grid;place-items:center;padding:24px;background:rgba(0,0,0,.6)}
-.note section{width:min(460px,100%);padding:28px 30px 24px;border-radius:18px;background:var(--ground);box-shadow:0 0 0 1px var(--line);display:flex;flex-direction:column;gap:14px}
-.note h1{margin:0;font:600 30px/1.1 var(--voice)}
-.note p{margin:0;font-size:15px;line-height:1.6;color:var(--ink-2)}
-.note p strong{color:var(--ink)}
-.note .check{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.5}
-.note .check input{margin:3px 0 0;width:16px;height:16px;accent-color:var(--accent)}
-.note .row{display:flex;gap:8px;margin-top:6px}
-.note .row .primary{flex:1;min-height:44px}
-.note .row .btn{min-height:44px}
-.dark-hint{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);color:#6d6270;font-size:13px;opacity:0;transition:opacity 1s}
-body.dark .dark-hint{opacity:1}
-`;
-document.head.append(style);
 
 const canvas = h('canvas', { 'aria-hidden': 'true' });
 document.body.append(canvas);
-const darkHint = h('p', { class: 'dark-hint' }, 'Dark. Press any key for light, or Esc again to close.');
+const darkHint = h('p', { class: 'dark-hint vis-ui' }, 'Dark. Esc again closes the window; any other key brings the light back.');
 document.body.append(darkHint);
 
 const vis = Visuals.create(canvas);
@@ -83,7 +56,7 @@ let frame: Frame = { rms: 0, low: 0, high: 0, phase: 'ready', mode: 'meditate', 
 let lastFrameAt = 0;
 const follower = new SoundFollower();
 
-const nameEl = h('span', { class: 'name', 'aria-live': 'polite' });
+const nameEl = h('span', { class: 'vis-bar__scene', 'aria-live': 'polite' });
 function setName(): void {
   if (vis) nameEl.textContent = SCENES[vis.target()];
 }
@@ -123,11 +96,12 @@ function draw(now: number): void {
   requestAnimationFrame(draw);
 }
 
-/** Choose the next palette; the change cross-fades over about four seconds. */
-function cyclePalette(): void {
-  const next = vis?.cyclePalette();
+/** Choose a palette (or the next one); the change cross-fades over about four seconds. */
+function choosePalette(index?: number): void {
+  if (!vis) return;
+  const next = index === undefined ? vis.cyclePalette() : vis.choosePalette(index);
   if (next == null) return;
-  paletteBtn?.replaceChildren(PALETTES[next].name);
+  paintSwatches(next);
   settings.visualsPalette = next;
   void patchSettings({ visualsPalette: next });
 }
@@ -136,11 +110,20 @@ function cyclePalette(): void {
 
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
 let pacerBtn: HTMLButtonElement | null = null;
-let paletteBtn: HTMLButtonElement | null = null;
+let lightBtn: HTMLButtonElement | null = null;
+let lightPanel: HTMLElement | null = null;
+const swatches: HTMLButtonElement[] = [];
+/** Repaints the Light panel's safety settings after another window changed them. */
+let paintSafety: () => void = () => undefined;
+
 function poke(): void {
   document.body.classList.remove('idle');
   if (idleTimer) clearTimeout(idleTimer);
-  idleTimer = setTimeout(() => document.body.classList.add('idle'), 3500);
+  idleTimer = setTimeout(() => {
+    // Never while the pointer is over the toolbar or the panel, or focus is in them.
+    if (document.querySelector('.vis-bar:hover, .light-panel:hover, .vis-bar:focus-within, .light-panel:focus-within')) return poke();
+    document.body.classList.add('idle');
+  }, 3500);
 }
 
 async function toggleFullscreen(): Promise<void> {
@@ -157,72 +140,165 @@ async function closeWindow(): Promise<void> {
   else window.close();
 }
 
+function iconButton(icon: UiIcon, label: string, onClick: () => void, extra: Record<string, string> = {}): HTMLButtonElement {
+  const b = h('button', { class: 'icon-btn', type: 'button', 'aria-label': label, title: label, ...extra }, uiIcon(icon));
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+/** Each palette's swatch: two of its colors, split on the diagonal. */
+const SWATCHES: Record<string, [string, string]> = {
+  Twilight: ['#8A6FD8', '#F0A57A'],
+  Hearth: ['#C8553D', '#F2C27A'],
+  'Sea glass': ['#2A9D8F', '#A8E6CF'],
+  Moss: ['#5F7F35', '#C6E3A0'],
+  Dusk: ['#74437F', '#F0A3B5'],
+  Moonlight: ['#5E66A6', '#E6EBFF'],
+};
+
+function paintSwatches(current: number): void {
+  swatches.forEach((b, i) => {
+    b.setAttribute('aria-checked', String(i === current));
+    b.tabIndex = i === current ? 0 : -1;
+  });
+}
+
+function slider(label: string, min: number, max: number, value: number, words: (v: number) => string, on: (v: number) => void): { el: HTMLElement; set(v: number): void } {
+  const input = h('input', { class: 'range', type: 'range', min, max, step: 0.01, value, 'aria-label': label });
+  const out = h('span', { class: 'field__value', 'aria-hidden': 'true' });
+  const paint = () => {
+    input.style.setProperty('--v', String((Number(input.value) - min) / (max - min)));
+    out.textContent = words(Number(input.value));
+    input.setAttribute('aria-valuetext', out.textContent);
+  };
+  input.addEventListener('input', () => {
+    paint();
+    on(Number(input.value));
+  });
+  paint();
+  return {
+    el: h('label', { class: 'field' }, h('span', {}, label), input, out),
+    set: (v) => {
+      if (document.activeElement === input) return;
+      input.value = String(v);
+      paint();
+    },
+  };
+}
+
+function buildLightPanel(): HTMLElement {
+  const flow = slider('Flow', 0.2, 2, state.flow, (v) => (v < 0.7 ? 'slow' : v < 1.3 ? 'gentle' : 'lively'), (v) => (state.flow = v));
+  const glow = slider('Glow', 0.15, 1.2, state.glow, (v) => (v < 0.7 ? 'soft' : v < 1 ? 'warm' : 'bright'), (v) => (state.glow = v));
+  const palettes = h('div', { class: 'swatches', role: 'radiogroup', 'aria-label': 'Palette' });
+  PALETTES.forEach((pal, i) => {
+    const [a, b] = SWATCHES[pal.name] ?? ['#888', '#ccc'];
+    const sw = h('button', { class: 'swatch', type: 'button', role: 'radio', 'aria-checked': 'false', 'aria-label': pal.name, title: pal.name, style: `--a:${a};--b:${b}` });
+    sw.addEventListener('click', () => choosePalette(i));
+    swatches.push(sw);
+    palettes.append(sw);
+  });
+  palettes.addEventListener('keydown', (e) => {
+    const i = swatches.indexOf(document.activeElement as HTMLButtonElement);
+    if (i < 0 || (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const j = (i + (e.key === 'ArrowRight' ? 1 : swatches.length - 1)) % swatches.length;
+    swatches[j].focus();
+    choosePalette(j);
+  });
+  paintSwatches(vis?.targetPalette() ?? 0);
+
+  const calm = h('button', { class: 'switch', type: 'button', role: 'switch', 'aria-label': 'Calm visuals', 'aria-checked': String(settings.calmVisuals) });
+  calm.addEventListener('click', async () => {
+    settings = await patchSettings({ calmVisuals: !settings.calmVisuals });
+    paintSafety();
+  });
+  const cap = slider('Brightness limit', 0.3, 1, settings.brightnessCap, (v) => `${Math.round(v * 100)}%`, (v) => {
+    settings.brightnessCap = Math.round(v * 100) / 100;
+    void patchSettings({ brightnessCap: settings.brightnessCap });
+  });
+  const follow = slider('Follow the sound', 0, 1, settings.audioReactivity, (v) => `${Math.round(v * 100)}%`, (v) => {
+    settings.audioReactivity = Math.round(v * 100) / 100;
+    void patchSettings({ audioReactivity: settings.audioReactivity });
+  });
+  paintSafety = () => {
+    calm.setAttribute('aria-checked', String(settings.calmVisuals));
+    cap.set(settings.brightnessCap);
+    follow.set(settings.audioReactivity);
+  };
+
+  return h(
+    'div',
+    { class: 'light-panel vis-ui', id: 'light-panel', role: 'dialog', 'aria-label': 'Light', 'data-closed': '' },
+    h('div', { class: 'light-panel__head' }, h('h2', { class: 'light-panel__title' }, 'Light'), h('span', { class: 'light-panel__note' }, 'P cycles palettes')),
+    flow.el,
+    glow.el,
+    h('div', { class: 'field field--palette' }, h('span', {}, 'Palette'), palettes),
+    h('hr'),
+    h('div', { class: 'row' }, h('div', { class: 'row__text' }, h('span', { class: 'row__label' }, 'Calm visuals'), h('span', { class: 'row__help' }, 'Slower, dimmer, softer contrast.')), calm),
+    cap.el,
+    follow.el,
+    h('p', { class: 'light-panel__foot' }, 'Brightness never changes faster than three times a second, and the beat never drives the picture.'),
+  );
+}
+
+function toggleLight(open?: boolean): void {
+  if (!lightPanel || !lightBtn) return;
+  const on = open ?? lightPanel.hasAttribute('data-closed');
+  lightPanel.toggleAttribute('data-closed', !on);
+  lightPanel.inert = !on;
+  lightBtn.setAttribute('aria-expanded', String(on));
+}
+
 function buildBar(): HTMLElement {
-  const prev = h('button', { class: 'icon-btn', 'aria-label': 'Previous scene' }, '‹');
-  const next = h('button', { class: 'icon-btn', 'aria-label': 'Next scene' }, '›');
-  prev.addEventListener('click', () => goTo(target() - 1));
-  next.addEventListener('click', () => goTo(target() + 1));
-  const drift = h('button', { class: 'btn', 'aria-pressed': 'true' }, 'Drift');
-  drift.addEventListener('click', () => {
+  const prev = iconButton('chevron-left', 'Previous scene', () => goTo(target() - 1));
+  const next = iconButton('chevron-right', 'Next scene', () => goTo(target() + 1));
+  const drift = iconButton('drift', 'Drift to the next scene every 80 seconds', () => {
     if (!vis) return;
     vis.drift = !vis.drift;
     vis.since = 0;
     drift.setAttribute('aria-pressed', String(vis.drift));
-  });
-  const slider = (label: string, min: number, max: number, value: number, on: (v: number) => void) => {
-    const input = h('input', { type: 'range', class: 'scale', min, max, step: 0.01, value });
-    const paint = () => input.style.setProperty('--lit-w', `${((Number(input.value) - min) / (max - min)) * 100}%`);
-    input.addEventListener('input', () => {
-      paint();
-      on(Number(input.value));
-    });
-    paint();
-    return h('label', {}, label, input);
-  };
-  const calm = h('button', { class: 'btn', 'aria-pressed': String(settings.calmVisuals) }, 'Calm');
-  calm.addEventListener('click', async () => {
-    settings.calmVisuals = !settings.calmVisuals;
-    calm.setAttribute('aria-pressed', String(settings.calmVisuals));
-    settings = await patchSettings({ calmVisuals: settings.calmVisuals });
-  });
-  pacerBtn = h('button', { class: 'btn', 'aria-pressed': 'false', title: 'A ring that grows as you breathe in and shrinks as you breathe out, 5.5 breaths a minute' }, 'Breath pacer');
-  pacerBtn.addEventListener('click', () => {
+  }, { 'aria-pressed': 'true' });
+  pacerBtn = iconButton('breath-pacer', 'Breath pacer', () => {
     state.pacer = !state.pacer;
     pacerBtn!.setAttribute('aria-pressed', String(state.pacer));
-  });
-  paletteBtn = h('button', { class: 'btn', title: 'Palette (P)' }, PALETTES[vis?.palette ?? 0].name);
-  paletteBtn.addEventListener('click', () => cyclePalette());
-  const fs = h('button', { class: 'btn' }, 'Full screen');
-  fs.addEventListener('click', () => void toggleFullscreen());
-  const close = h('button', { class: 'btn quiet' }, 'Close');
-  close.addEventListener('click', () => void closeWindow());
+  }, { 'aria-pressed': 'false' });
+  lightBtn = iconButton('brightness', 'Light', () => toggleLight(), { 'aria-expanded': 'false', 'aria-controls': 'light-panel' });
+  const fs = iconButton('fullscreen', 'Full screen', () => void toggleFullscreen());
+  const close = iconButton('close', 'Close visuals', () => void closeWindow());
   setName();
   return h(
     'div',
-    { class: 'bar', role: 'toolbar', 'aria-label': 'Visuals' },
-    h('div', { class: 'grp' }, prev, nameEl, next, drift),
-    slider('Flow', 0.2, 2, state.flow, (v) => (state.flow = v)),
-    slider('Glow', 0.15, 1.2, state.glow, (v) => (state.glow = v)),
-    h('div', { class: 'grp' }, paletteBtn, pacerBtn, calm, fs, close),
+    { class: 'vis-bar vis-ui', role: 'toolbar', 'aria-label': 'Visuals' },
+    prev,
+    nameEl,
+    next,
+    h('span', { class: 'vis-bar__sep', 'aria-hidden': 'true' }),
+    drift,
+    pacerBtn,
+    lightBtn,
+    fs,
+    h('span', { class: 'vis-bar__sep', 'aria-hidden': 'true' }),
+    close,
   );
 }
 
 function firstOpenNote(): Promise<boolean> {
   return new Promise((resolve) => {
     const calm = h('input', { type: 'checkbox', id: 'calm', checked: true });
-    const show = h('button', { class: 'btn primary' }, 'Show visuals');
-    const notNow = h('button', { class: 'btn' }, 'Not now');
+    const show = h('button', { class: 'btn btn--primary', type: 'button' }, 'Show visuals');
+    const notNow = h('button', { class: 'btn', type: 'button' }, 'Not now');
     const note = h(
       'div',
-      { class: 'note' },
+      { class: 'note vis-ui' },
       h(
         'section',
-        { role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'note-title' },
+        { class: 'dialog', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'note-title' },
         h('h1', { id: 'note-title' }, 'Before the lights come up'),
         h('p', {}, 'The visuals fill the screen with slow, shifting color. Brightness never changes faster than three times a second, and Calm visuals keeps it dimmer still.'),
         h('p', {}, 'If you have photosensitive epilepsy, or patterns of light have ever made you unwell, talk to your doctor before using them. If anything feels wrong, press Esc and the screen fades to dark at once.'),
-        h('label', { class: 'check', for: 'calm' }, calm, h('span', {}, h('strong', {}, 'Calm visuals'), ': dimmer, slower, softer color. Change it any time in Settings.')),
-        h('div', { class: 'row' }, show, notNow),
+        h('label', { class: 'check', for: 'calm' }, calm, h('span', {}, 'Calm visuals (you can change this in the Light panel)')),
+        h('div', { class: 'dialog__actions' }, notNow, show),
       ),
     );
     document.body.append(note);
@@ -243,6 +319,11 @@ addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     e.preventDefault();
     if (e.repeat) return;
+    if (lightPanel && !lightPanel.hasAttribute('data-closed') && lightPanel.contains(document.activeElement)) {
+      toggleLight(false);
+      lightBtn?.focus();
+      return;
+    }
     if (state.dark) void closeWindow();
     else {
       state.dark = true;
@@ -257,11 +338,11 @@ addEventListener('keydown', (e) => {
   }
   if (e.repeat) return;
   if (e.key === 'f' || e.key === 'F') void toggleFullscreen();
-  else if (e.key === 'ArrowRight') goTo(target() + 1);
-  else if (e.key === 'ArrowLeft') goTo(target() - 1);
+  else if (e.key === 'ArrowRight' && !(e.target as HTMLElement).matches?.('input')) goTo(target() + 1);
+  else if (e.key === 'ArrowLeft' && !(e.target as HTMLElement).matches?.('input')) goTo(target() - 1);
   else if (e.key === 'e' || e.key === 'E') goTo(EMBER);
   else if (e.key === 'b' || e.key === 'B') pacerBtn?.click();
-  else if (e.key === 'p' || e.key === 'P') cyclePalette();
+  else if (e.key === 'p' || e.key === 'P') choosePalette();
   else if (e.key === ' ' && document.activeElement === document.body) {
     e.preventDefault();
     void emitTo('main', 'remote-action', 'go');
@@ -281,6 +362,7 @@ async function boot(): Promise<void> {
     const { reloadDoc } = await import('../platform/store');
     await reloadDoc();
     settings = await loadSettings();
+    paintSafety();
   });
   void emitTo('main', 'visuals-hello');
   if (!settings.visualsWarned) {
@@ -295,7 +377,9 @@ async function boot(): Promise<void> {
     document.body.append(h('p', { style: 'color:#aaa;padding:24px' }, `This ${computer} could not start WebGL, so the visuals can’t run here. The sound is unaffected.`));
     return;
   }
-  document.body.append(buildBar());
+  lightPanel = buildLightPanel();
+  lightPanel.inert = true;
+  document.body.append(lightPanel, buildBar());
   poke();
   requestAnimationFrame(draw);
   void isTauri;
