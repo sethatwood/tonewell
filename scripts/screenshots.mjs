@@ -48,21 +48,22 @@ try {
   await shot(p, 'mini-focus');
   await p.close();
 
-  // The full controls under the player
-  p = await page(380, 744, 'index.html');
-  await p.click('[aria-label="Shape the sound"]');
-  await p.mouse.move(370, 700);
-  await p.waitForTimeout(400);
-  await shot(p, 'panel-sound');
-  await p.click('.layer .disclosure');
-  await p.waitForTimeout(200);
-  await shot(p, 'panel-sound-drone');
-  await p.click('#tab-beat');
-  await p.waitForTimeout(200);
-  await shot(p, 'panel-beat');
-  await p.click('#tab-session');
-  await p.waitForTimeout(200);
-  await shot(p, 'panel-session');
+  // The sheets under the player (in a browser the window doesn't grow, so the page is tall)
+  p = await page(380, 760, 'index.html');
+  for (const [name, open] of [
+    ['sheet-sound', '.eyebrow'],
+    ['sheet-session', '[data-sheet="session"]'],
+    ['sheet-beat', '[data-sheet="beat"]'],
+    ['sheet-shape', '[aria-label="Shape the sound"]'],
+  ]) {
+    await p.hover('.player__main');
+    await p.click(open);
+    await p.mouse.move(375, 755);
+    await p.waitForTimeout(600);
+    await shot(p, name);
+    await p.keyboard.press('Escape');
+    await p.waitForTimeout(400);
+  }
   await p.close();
 
   for (const [name, path, w, hgt] of [

@@ -349,3 +349,47 @@ would break the rule that nothing startles, so it waits. The manifest
 lives on the project's own domain so the binaries can move without
 stranding installed copies, and keeping the updater key off CI means
 publishing an update needs the release Mac, not just push access.
+
+## 22. Sheets under the player, one at a time
+
+**Decision.** Everything beyond start and stop is a sheet under the
+player, opened from the thing it's about: the eyebrow and name open
+Sound (the mode and every sound as a card with its blurb and layer
+lights), the length chip opens Session, the beat chip opens Beat (purpose
+first, hertz second; Custom beat has every setting), the Shape tool opens
+Shape (a feel pad for Warmth and Motion, the layers as chips, More like
+this, Keep as my sound; All settings lists every parameter from the
+table), and ? opens a field guide. The window grows downward to fit, up
+to 760 pt, with the system's animation; if that would run off the screen
+it moves up, and back down when the sheet closes. Esc, Done or the same
+control closes a sheet before Esc can reach the stop ladder, and focus
+returns to the control that opened it. While winding down only Shape,
+Beat and Session open; resting after the timer, ending or paused, none.
+Naming, renaming and deleting your sounds is a small sheet with its
+focus kept inside. The menu bar's submenus are the sheets' lists, in the
+same words and order. The old panel and its three tabs are gone.
+
+More like this moves every setting that shapes the sound without
+changing what it is by up to a tenth of its slider (levels by half
+that), around what is playing now, gliding over a few seconds; it never
+touches switches, choices, the root, the beat or the feel pad, and
+nothing turned all the way down wakes up. Revert undoes it.
+
+**Why.** One long panel with tabs put every control the same distance
+away, so nothing was near. A sheet opened from its own chip answers the
+question that chip raises, with room for descriptions, and the player
+stays on top of it so the session is always in reach.
+
+## 23. The light's settings live with the light
+
+**Decision.** Calm visuals, the brightness limit and Follow the sound
+moved from Settings into the visuals window's Light panel, with Flow,
+Glow and the palettes. Settings keeps only how the app behaves, in four
+tabs: General, Shortcuts, Sessions and About (which has the version and
+the update switch). Learn's reading size follows ⌘+, ⌘− and ⌘0, or A−
+and A+ beside the window's name, and is remembered.
+
+**Why.** Everything about the light is now in the one place you're
+looking at when you want to change it. The reading size came from use:
+Learn's text was too small on a large display.
+

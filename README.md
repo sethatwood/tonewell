@@ -42,19 +42,25 @@ hours of unobtrusive sound alongside your other apps.
 - **Meditate and Focus.** Meditate has a wandering drone, bells and a
   theta beat that glides down from alpha. Focus is steadier: noise beds,
   rain, a still drone, no bells, no beat unless you ask.
-- **Two knobs that matter.** Warmth (warm to bright) and Drift (still to
-  wandering), both centered on the preset as designed. Everything else is
-  one click away in the panel: every layer, the beat, the session.
+- **Everything else is a sheet away.** The length chip opens the session's
+  settings, the beat chip the beats (named by what they're used for, hertz
+  beside), and the sound's name every sound, each with a description and
+  the lights of the layers in it. Shape has a feel pad (warmer or
+  brighter across, stiller or wandering up and down, the middle is the
+  sound as made), the layers as chips to add or take out, More like this,
+  and Keep as my sound. The window grows to fit a sheet, and Esc or the
+  same control puts it away. ? opens a field guide.
 - **Honest about binaural beats.** The Learn window explains what they
   are, what the research does and doesn't show, and where folklore like
-  432 Hz comes from, with sources you can check.
+  432 Hz comes from, with sources you can check. ⌘+ makes the reading
+  text larger, and it stays that way.
 - **Optional visuals.** Fifteen slow scenes in their own window, six
   palettes, a breath pacer, brightness that never changes faster than
-  three times a second, and a Calm mode on by default. "Follow the
-  sound" sets how much they respond: the shapes swell with the drone,
-  bells bloom into light, and a new note shifts the colors. The beat
-  never reaches the picture. With no visuals window open, nothing
-  renders.
+  three times a second, and a Calm mode on by default; everything about
+  the light is in one Light panel there. "Follow the sound" sets how much
+  they respond: the shapes swell with the drone, bells bloom into light,
+  and a new note shifts the colors. The beat never reaches the picture.
+  With no visuals window open, nothing renders.
 - **Kind to work.** Focus presets are steady and barely use the CPU (about
   1% of one core for Brown Noise Desk). Turn on "Soften during calls" and
   the sound dips whenever an app is using a microphone.
@@ -77,7 +83,7 @@ hours of unobtrusive sound alongside your other apps.
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/panel-beat.png" width="300" alt="The Beat section: binaural, monaural or isochronic, a beat slider with equal-width brainwave bands, and a glide from 10 Hz to 6 Hz">
+  <img src="docs/screenshots/sheet-shape.png" width="300" alt="The Shape sheet: a feel pad from warmer to brighter and still to wandering, the layers as chips, the beat, and More like this">
   &nbsp;
   <img src="docs/screenshots/learn.png" width="460" alt="The Learn window, showing 'How binaural beats work' with numbered sources">
 </p>
@@ -146,7 +152,8 @@ checks.
   AudioWorklet for textures, and a lookahead scheduler on the audio clock.
 - `src/session` holds the session: start, wind down, resume, end, timers,
   device changes.
-- `src/ui` is the player, the panel beneath it and the menu-bar menu.
+- `src/ui` is the player, the sheets beneath it (`src/ui/sheets`) and the
+  menu-bar menu.
   `src/styles/tokens.css` holds the colours, type and timing for both
   modes and every phase of a session.
 - `src/visuals`, `src/learn` and `src/settings` are the other windows.
