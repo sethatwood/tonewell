@@ -5,7 +5,8 @@ import { emit } from '../platform/bridge';
 
 export interface AppSettings {
   alwaysOnTop: boolean;
-  folded: boolean;
+  /** The player shrunk to the light alone. */
+  mini: boolean;
   showTimeInMenuBar: boolean;
   launchAtLogin: boolean;
   shortcutsEnabled: boolean;
@@ -24,7 +25,7 @@ export interface AppSettings {
 
 export const SETTINGS_DEFAULT: AppSettings = {
   alwaysOnTop: false,
-  folded: false,
+  mini: false,
   showTimeInMenuBar: false,
   launchAtLogin: false,
   shortcutsEnabled: false,

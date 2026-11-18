@@ -47,12 +47,21 @@ export const PREFS_DEFAULT: Record<Mode, SessionPrefs> = {
   },
 };
 
+/** What a notice is about, which sets its priority and how the player words it. */
+export type NoticeKind = 'unplugged' | 'interrupted' | 'slept' | 'muted' | 'back' | 'output' | 'softer' | 'done';
+
 export interface Notice {
+  kind: NoticeKind;
   text: string;
   actions?: Array<{ id: string; label: string }>;
   /** Seconds before it clears itself; absent for notices that wait for the user. */
   ttl?: number;
 }
+
+/** When two notices meet, the higher one shows and the lower one waits behind it. */
+const NOTICE_RANK: Record<NoticeKind, number> = { unplugged: 5, interrupted: 5, slept: 4, muted: 3, back: 2, output: 2, softer: 1, done: 0 };
+
+const MUTED: Notice = { kind: 'muted', text: 'Your Mac’s sound is muted.' };
 
 export interface Snapshot {
   phase: Phase;
@@ -75,6 +84,12 @@ export interface Snapshot {
   output: { name: string; kind: string } | null;
   /** Seconds into the drone's filter sweep, so the glow can breathe in time with it. */
   sweepPhase: number;
+  /** Silenced because the output disappeared or the system interrupted the sound; waits for Resume or End. */
+  paused: boolean;
+  /** Seconds left of a timed rest (after the timer) or a Focus break, or null. */
+  restLeft: number | null;
+  /** Which Focus block this is, counting from 1; 0 when nothing is running. */
+  block: number;
 }
 
 interface ModeState {
@@ -108,6 +123,12 @@ export class Session extends EventTarget {
   private inBreak = false;
   private phaseTimer: ReturnType<typeof setTimeout> | null = null;
   private noticeTimer: ReturnType<typeof setTimeout> | null = null;
+  /** A lower notice waiting behind the one showing, with the wall time it stops applying. */
+  private pendingNotice: { notice: Notice; until: number } | null = null;
+  /** Wall time the showing notice clears itself, or Infinity. */
+  private noticeUntil = Infinity;
+  private muted = false;
+  private block = 0;
   private lastEsc = -Infinity;
   private lastWall = Date.now();
   private deviceLost: { name: string; at: number } | null = null;
@@ -328,7 +349,7 @@ export class Session extends EventTarget {
     if (on === this.ducked) return;
     this.ducked = on;
     this.engine?.setVolume(this.effectiveVolume());
-    if (on && this.isRunning()) this.setNotice({ text: 'A microphone is in use, so the sound is softer.', ttl: 6 });
+    if (on && this.isRunning()) this.setNotice({ kind: 'softer', text: 'A microphone is in use, so the sound is softer.', ttl: 6 });
     this.emit();
   }
 
@@ -428,6 +449,7 @@ export class Session extends EventTarget {
     this.startedWall = new Date();
     this.timerDone = false;
     this.inBreak = false;
+    this.block = 1;
     this.restEndsAt = null;
     this.endAt = prefs.minutes ? this.startAt + prefs.minutes * 60 : null;
     this.engine.fade(1, prefs.fadeIn);
@@ -435,7 +457,8 @@ export class Session extends EventTarget {
     this.applyBeatPlan(0);
     this.armSafetyNet();
     this.phase = 'playing';
-    this.setNotice(null);
+    this.clearNotices(['unplugged', 'interrupted', 'slept', 'done']);
+    if (this.muted && this.notice?.kind !== 'muted') this.setNotice(MUTED);
     this.updateKeepAwake();
     this.emit();
   }
@@ -487,7 +510,7 @@ export class Session extends EventTarget {
       this.applyBeatPlan(2);
     }
     this.phase = 'playing';
-    this.setNotice(null);
+    this.clearNotices(['unplugged', 'interrupted', 'slept', 'done']);
     this.updateKeepAwake();
     this.emit();
   }
@@ -528,10 +551,13 @@ export class Session extends EventTarget {
     this.endAt = null;
     this.restEndsAt = null;
     this.startedWall = null;
+    this.block = 0;
     this.inBreak = false;
     this.windStartedAt = null;
     this.pausedForDevice = false;
     this.deviceLost = null;
+    // Notices about a running session no longer apply once it's over.
+    this.clearNotices(['unplugged', 'interrupted', 'muted', 'softer', 'output', 'back']);
     this.updateKeepAwake();
     this.emit();
   }
@@ -546,6 +572,7 @@ export class Session extends EventTarget {
   /** Begin a new block now (session start, or after a Focus break). */
   private startBlock(now: number): void {
     this.inBreak = false;
+    this.block += 1;
     this.blockStart = now;
     this.endAt = this.prefs.minutes ? now + this.prefs.minutes * 60 : null;
     this.armSafetyNet();
@@ -675,7 +702,7 @@ export class Session extends EventTarget {
       this.engine?.silence();
       void this.ctx?.suspend();
       this.finish();
-      this.setNotice({ text: 'Stopped while your Mac slept.', actions: [{ id: 'start', label: 'Start again' }] });
+      this.setNotice({ kind: 'slept', text: 'Stopped while your Mac slept.', actions: [{ id: 'start', label: 'Start again' }] });
       return;
     }
     if (!this.ctx || !this.isRunning() || this.pausedForDevice) return;
@@ -695,7 +722,7 @@ export class Session extends EventTarget {
     const state = this.ctx?.state as string | undefined;
     if (state === 'interrupted' && this.engine && this.phase !== 'ready') {
       // Fades can't run on a stopped clock: mute now, so the system can't resume us at full level.
-      this.pauseQuietly('Sound was interrupted by the system.');
+      this.pauseQuietly('interrupted', 'Sound was interrupted by the system.');
     }
   }
 
@@ -703,11 +730,13 @@ export class Session extends EventTarget {
   onOutputChange(change: { change: string; previous: { name: string; kind: string } | null; current: { name: string; kind: string } | null }): void {
     this.output = change.current;
     if (change.change === 'muted') {
-      if (this.isRunning()) this.setNotice({ text: 'Your Mac’s sound is muted.' });
+      this.muted = true;
+      if (this.isRunning()) this.setNotice(MUTED);
       return;
     }
     if (change.change === 'unmuted') {
-      if (this.notice?.text === 'Your Mac’s sound is muted.') this.setNotice(null);
+      this.muted = false;
+      if (this.notice?.kind === 'muted') this.setNotice(null);
       return;
     }
     this.engine?.setParams(this.engineParams(), 1);
@@ -720,7 +749,7 @@ export class Session extends EventTarget {
       }
       // The one fast change: mute at once so nothing comes out of the speakers, in any phase.
       const lost = change.previous;
-      this.pauseQuietly(`${lost?.kind === 'headphones' ? 'Headphones out' : `${lost?.name ?? 'Output'} gone`}, paused.`);
+      this.pauseQuietly('unplugged', `${lost?.kind === 'headphones' ? 'Headphones out' : `${lost?.name ?? 'Output'} gone`}, paused.`);
       this.deviceLost = { name: lost?.name ?? 'Headphones', at: Date.now() };
       return;
     }
@@ -729,7 +758,7 @@ export class Session extends EventTarget {
       change.current?.name === this.deviceLost.name && Date.now() - this.deviceLost.at < 60000
     ) {
       // The same headphones came back within a minute: fade back in gently.
-      void this.resume().then(() => this.setNotice({ text: `Back on ${change.current?.name}.`, ttl: 4 }));
+      void this.resume().then(() => this.setNotice({ kind: 'back', text: `Back on ${change.current?.name}.`, ttl: 4 }));
       return;
     }
     if (change.change === 'switched' && change.current && this.phase === 'playing' && this.engine) {
@@ -740,13 +769,13 @@ export class Session extends EventTarget {
         this.switchTimer = null;
         if (this.phase === 'playing') this.engine?.fade(1, 3);
       }, 400);
-      this.setNotice({ text: `Now through ${change.current.name}.`, ttl: 4 });
+      this.setNotice({ kind: 'output', text: `Now through ${change.current.name}.`, ttl: 4 });
     }
     this.emit();
   }
 
   /** Mute at once and hold, with timers frozen, until the person chooses Resume or End. */
-  private pauseQuietly(message: string): void {
+  private pauseQuietly(kind: 'unplugged' | 'interrupted', message: string): void {
     if (!this.engine) return;
     this.clearPhaseTimer();
     this.engine.silence();
@@ -755,7 +784,7 @@ export class Session extends EventTarget {
     this.engine.clearEnd();
     this.phase = 'resting';
     setTimeout(() => void this.ctx?.suspend(), 80);
-    this.setNotice({ text: message, actions: [{ id: 'resume', label: 'Resume' }, { id: 'end', label: 'End' }] });
+    this.setNotice({ kind, text: message, actions: [{ id: 'resume', label: 'Resume' }, { id: 'end', label: 'End' }] });
     this.updateKeepAwake();
     this.emit();
   }
@@ -773,16 +802,63 @@ export class Session extends EventTarget {
     }
   }
 
+  /**
+   * Show a notice, or clear the current one with null. A notice that ranks
+   * below the one showing waits behind it; one that ranks the same or higher
+   * takes its place, and the one it replaces waits instead. A waiting notice
+   * shows when the one in front clears, if it still applies.
+   */
   setNotice(n: Notice | null): void {
+    if (n && this.notice && NOTICE_RANK[n.kind] < NOTICE_RANK[this.notice.kind]) {
+      this.park(n, n.ttl ? Date.now() + n.ttl * 1000 : Infinity);
+      return;
+    }
     if (this.noticeTimer) clearTimeout(this.noticeTimer);
+    this.noticeTimer = null;
+    if (n && this.notice && this.notice !== n) this.park(this.notice, this.noticeUntil);
+    if (!n && this.pendingNotice) {
+      const { notice, until } = this.pendingNotice;
+      this.pendingNotice = null;
+      if (this.stillApplies(notice, until)) {
+        const left = until - Date.now();
+        n = Number.isFinite(left) ? { ...notice, ttl: left / 1000 } : notice;
+      }
+    }
     this.notice = n;
+    this.noticeUntil = n?.ttl ? Date.now() + n.ttl * 1000 : Infinity;
     if (n?.ttl) {
-      this.noticeTimer = setTimeout(() => {
-        this.notice = null;
-        this.emit();
-      }, n.ttl * 1000);
+      this.noticeTimer = setTimeout(() => this.setNotice(null), n.ttl * 1000);
     }
     this.emit();
+  }
+
+  /** Clear any notice of these kinds, showing or waiting: what an action has just resolved. */
+  private clearNotices(kinds: NoticeKind[]): void {
+    if (this.pendingNotice && kinds.includes(this.pendingNotice.notice.kind)) this.pendingNotice = null;
+    if (this.notice && kinds.includes(this.notice.kind)) this.setNotice(null);
+  }
+
+  /** Keep the higher of a notice and the one already waiting. */
+  private park(notice: Notice, until: number): void {
+    if (!this.stillApplies(notice, until)) return;
+    if (!this.pendingNotice || NOTICE_RANK[notice.kind] >= NOTICE_RANK[this.pendingNotice.notice.kind]) {
+      this.pendingNotice = { notice, until };
+    }
+  }
+
+  private stillApplies(notice: Notice, until: number): boolean {
+    if (until - Date.now() < 500) return false;
+    switch (notice.kind) {
+      case 'muted':
+        return this.muted;
+      case 'softer':
+        return this.ducked;
+      case 'unplugged':
+      case 'interrupted':
+        return this.pausedForDevice;
+      default:
+        return true;
+    }
   }
 
   // ---------- keep awake ----------
@@ -856,6 +932,9 @@ export class Session extends EventTarget {
       notice: this.notice,
       output: this.output,
       sweepPhase: this.isRunning() ? (now - this.startAt) % this.params.sweepPeriod : 0,
+      paused: this.pausedForDevice,
+      restLeft: this.restEndsAt !== null && this.isRunning() ? Math.max(0, this.restEndsAt - now) : null,
+      block: this.block,
     };
   }
 

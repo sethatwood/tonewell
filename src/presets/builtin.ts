@@ -10,6 +10,8 @@ export interface Preset {
   name: string;
   mode: Mode;
   blurb: string;
+  /** One line for the player's hint line; the blurb is the full description. */
+  short?: string;
   params: Partial<SoundParams>;
   builtin?: boolean;
 }
@@ -40,6 +42,7 @@ export const BUILTIN_PRESETS: readonly Preset[] = [
     name: 'Deep Theta',
     mode: 'meditate',
     blurb: 'The first Tonewell sound: a wandering drone, breath, slow bells and a 6 Hz beat that settles from 10 Hz.',
+    short: 'Wandering drone, breath, slow bells.',
     params: { rampOn: 1, rampFrom: 10, beatHz: 6, rampMin: 6 },
   },
   {
@@ -47,6 +50,7 @@ export const BUILTIN_PRESETS: readonly Preset[] = [
     name: 'Soft Alpha',
     mode: 'meditate',
     blurb: 'Lighter and a little brighter, with a 10 Hz beat. For sits where you want to stay alert.',
+    short: 'Lighter and brighter, for alert sits.',
     params: { root: 36, voicing: 3, beatHz: 10, cutoff: 620, resonance: 4, bellsDensity: 8, bellsScale: 1, breathLevel: 0.4, reverbSize: 1 },
   },
   {
@@ -54,6 +58,7 @@ export const BUILTIN_PRESETS: readonly Preset[] = [
     name: 'Night Drone',
     mode: 'meditate',
     blurb: 'Low, dark and slow, with no bells. A 4.5 Hz beat under a deep hum.',
+    short: 'Low, dark and slow. No bells.',
     params: { root: 28, cutoff: 260, resonance: 3, sweepPeriod: 60, bellsOn: 0, sub: 0.8, beatHz: 4.5, reverbSize: 3, walkEvery: 90, breathLevel: 0.3, edge: 0.6 },
   },
   {
@@ -61,6 +66,7 @@ export const BUILTIN_PRESETS: readonly Preset[] = [
     name: 'Rain Bed',
     mode: 'meditate',
     blurb: 'Soft rain over a quiet drone, with the odd bell far away.',
+    short: 'Soft rain over a quiet drone.',
     params: { rainOn: 1, rainLevel: 0.6, rainDensity: 0.4, droneLevel: 0.5, breathOn: 0, bellsDensity: 5, bellsLevel: 0.4, beatLevel: 0.35, cutoff: 360 },
   },
   {
@@ -68,6 +74,7 @@ export const BUILTIN_PRESETS: readonly Preset[] = [
     name: 'Bells Only',
     mode: 'meditate',
     blurb: 'No drone: bells and shimmer in a large room, with a little breath.',
+    short: 'Bells and shimmer in a large room.',
     params: { droneOn: 0, breathLevel: 0.45, bellsLevel: 1, bellsDensity: 18, bellsDecay: 7, echoFeedback: 0.5, beatOn: 0, shimmerOn: 1, shimmerLevel: 0.5 },
   },
   {
@@ -75,6 +82,7 @@ export const BUILTIN_PRESETS: readonly Preset[] = [
     name: 'Journey',
     mode: 'meditate',
     blurb: 'A wordless choir drifting over the drone in a vast room, with shimmer and far-off bells. Made for the visuals.',
+    short: 'A wordless choir over the drone.',
     params: { voicesOn: 1, voicesLevel: 0.55, voicesDensity: 4, voicesRegister: 0.4, shimmerOn: 1, shimmerLevel: 0.3, bellsDensity: 6, bellsLevel: 0.4, beatOn: 0, reverbSize: 3, walkEvery: 70, breathLevel: 0.35, droneLevel: 0.55 },
   },
   {
@@ -82,6 +90,7 @@ export const BUILTIN_PRESETS: readonly Preset[] = [
     name: 'Brown Noise Desk',
     mode: 'focus',
     blurb: 'Deep, even brown noise and nothing else. The plainest bed there is.',
+    short: 'Deep, even brown noise. That’s all.',
     params: { droneOn: 0, noiseColor: 0, noiseLevel: 0.7, noiseTone: 1400, reverbMix: 0 },
   },
   {
@@ -89,6 +98,7 @@ export const BUILTIN_PRESETS: readonly Preset[] = [
     name: 'Warm Drone',
     mode: 'focus',
     blurb: 'A steady, rounded drone that barely moves, over a little pink noise.',
+    short: 'A steady, round drone. Barely moves.',
     params: { droneLevel: 0.6, cutoff: 340, resonance: 2, sweepPeriod: 120, sweepDepth: 80, noiseColor: 1, noiseLevel: 0.25, edge: 0.5 },
   },
   {
@@ -96,6 +106,7 @@ export const BUILTIN_PRESETS: readonly Preset[] = [
     name: 'Rain Room',
     mode: 'focus',
     blurb: 'Steady rain with a low drone underneath.',
+    short: 'Steady rain with a low drone under it.',
     params: { rainOn: 1, rainLevel: 0.7, rainDensity: 0.5, droneLevel: 0.35, cutoff: 300, noiseOn: 0 },
   },
   {
@@ -103,6 +114,7 @@ export const BUILTIN_PRESETS: readonly Preset[] = [
     name: 'Low Hum',
     mode: 'focus',
     blurb: 'Mostly sub and a closed filter, like a distant engine room.',
+    short: 'Mostly sub, a distant engine room.',
     params: { root: 28, cutoff: 180, resonance: 1.5, sub: 0.9, droneLevel: 0.55, voicing: 1, noiseColor: 0, noiseLevel: 0.3, noiseTone: 600 },
   },
   {
@@ -110,6 +122,7 @@ export const BUILTIN_PRESETS: readonly Preset[] = [
     name: 'Shoreline',
     mode: 'focus',
     blurb: 'Slow waves arriving and drawing back, with a faint drone.',
+    short: 'Slow waves arriving, drawing back.',
     params: { oceanOn: 1, oceanLevel: 0.7, droneLevel: 0.3, cutoff: 280, noiseOn: 0 },
   },
   {
@@ -117,6 +130,7 @@ export const BUILTIN_PRESETS: readonly Preset[] = [
     name: 'Steady Alpha',
     mode: 'focus',
     blurb: 'The warm drone with a quiet 10 Hz beat. Headphones needed for the binaural part.',
+    short: 'Warm drone, quiet 10 Hz beat.',
     params: { droneLevel: 0.6, cutoff: 340, resonance: 2, sweepPeriod: 120, sweepDepth: 80, noiseColor: 1, noiseLevel: 0.3, beatOn: 1, beatHz: 10, beatLevel: 0.4, edge: 0.5 },
   },
 ].map((p) => ({ ...p, builtin: true }) as Preset);

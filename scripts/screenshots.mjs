@@ -30,31 +30,28 @@ async function page(width, height, path, colorScheme = 'dark') {
 const shot = (p, name) => p.screenshot({ path: `${out}/${name}.png` });
 
 try {
-  // Mini player: ready, Meditate
-  let p = await page(400, 184, 'index.html');
+  // The player: ready, playing (once the colours have settled), resting, Focus
+  let p = await page(380, 156, 'index.html');
   await shot(p, 'mini-ready');
-  // Start, then show playing
-  await p.click('.well');
-  await p.mouse.move(250, 150);
-  await p.waitForTimeout(1500);
+  await p.click('.ripple');
+  await p.mouse.move(370, 150);
+  await p.waitForTimeout(9000);
   await shot(p, 'mini-playing');
-  // Wind down
-  await p.click('.stop-btn');
-  await p.mouse.move(250, 150);
-  await p.waitForTimeout(7000);
+  await p.click('.chip--action');
+  await p.mouse.move(370, 150);
+  await p.waitForTimeout(15000);
   await shot(p, 'mini-resting');
   await p.keyboard.press('Escape');
-  await p.waitForTimeout(500);
-  // Focus mode
-  await p.waitForTimeout(6500);
-  await p.click('.mode-radios [role="radio"]:nth-child(2)');
+  await p.waitForTimeout(7000);
+  await p.keyboard.press('Meta+2');
   await p.waitForTimeout(600);
   await shot(p, 'mini-focus');
   await p.close();
 
-  // Expanded panel
-  p = await page(400, 744, 'index.html');
-  await p.click('[aria-label="Show all controls"]');
+  // The full controls under the player
+  p = await page(380, 744, 'index.html');
+  await p.click('[aria-label="Shape the sound"]');
+  await p.mouse.move(370, 700);
   await p.waitForTimeout(400);
   await shot(p, 'panel-sound');
   await p.click('.layer .disclosure');

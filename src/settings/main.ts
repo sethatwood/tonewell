@@ -112,7 +112,7 @@ async function boot(): Promise<void> {
       h('section', {}, h('h2', {}, 'About'),
         h('p', {}, 'Tonewell makes every sound on your Mac as it plays: nothing is recorded, nothing is streamed, and nothing about how you use it leaves this computer.'),
         h('p', {}, 'Open source under the MIT License: ', repo, '.'),
-        h('p', { class: 'set-help' }, 'Type: Cormorant Garamond (The Cormorant Project Authors) and Atkinson Hyperlegible Next (Braille Institute of America), both under the SIL Open Font License.'),
+        h('p', { class: 'set-help' }, 'Type: Figtree, by Erik Kennedy, SIL Open Font License.'),
       ),
     ),
   );

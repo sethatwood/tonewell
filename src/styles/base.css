@@ -264,9 +264,7 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root {
-    --t-material: 0.24s;
-  }
+  /* Colour still follows the sound's pace (it isn't movement); only motion stops. */
   *,
   *::before,
   *::after {

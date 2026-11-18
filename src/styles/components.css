@@ -1,0 +1,242 @@
+/* Tonewell components: Still Water. The player, its light, the hint line,
+   chips, notices and the volume row; and mini mode, the light on its own.
+   Rules of the house:
+   - Only opacity and transform animate. Colours change with var(--t-material):
+     8 s while the sound plays, in step with it, and 240 ms otherwise.
+   - Every interactive element is a real <button> or <input>.
+   - The hint line is the help system: it shows the sound's description at
+     rest and explains whatever is pointed at or focused.
+   Button, icon-button and key-cap styles are scoped to the player's main row
+   while the panel and the secondary windows still use the older ones in
+   base.css. */
+
+/* ---------- basics ---------- */
+
+.num { font-variant-numeric: tabular-nums; }
+.icon { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.icon--fill { fill: currentColor; stroke: none; }
+
+/* Things whose colour follows the session. */
+.player__ground, .chip, .player__main .btn, .ripple__core, .ripple__ring, .ripple__disc, .eyebrow, .player__name, .rest-message, .notice {
+  transition-property: background-color, border-color, color, box-shadow;
+  transition-duration: var(--t-material);
+  transition-timing-function: var(--ease-sound);
+}
+
+/* ---------- the player window (380 × 156, opaque, frameless) ---------- */
+
+.player {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--ink);
+  font-variant-numeric: normal;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* The window's ground is its own layer, so mini mode can fade it without
+   waiting on the colour transition. */
+.player__ground {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-window);
+  background-color: var(--surface);
+  border: 1px solid var(--line);
+  opacity: 1;
+}
+.player__main {
+  position: relative;
+  flex: none;
+  /* The window is 156 tall including the 1 px border above and below. */
+  height: calc(var(--player-h) - 2px);
+  margin: 1px 1px 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  padding: 16px 15px 16px 14px;
+}
+.player__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--s1); transition: opacity 240ms var(--ease-ui); }
+.player__top { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); height: 24px; }
+.player__tools { display: flex; gap: 2px; margin-right: -6px; opacity: 0; transition: opacity var(--t-ui) var(--ease-ui); }
+.player:hover .player__tools, .player__main:focus-within .player__tools { opacity: 1; }
+.player__name {
+  display: block; max-width: 100%; padding: 0; border: none; background: transparent; text-align: left;
+  font-size: var(--fs-name); font-weight: var(--fw-strong); letter-spacing: var(--ls-name); line-height: var(--lh-tight);
+  color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.player__actions { display: flex; gap: 6px; margin-top: 7px; }
+.player__sheet { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+/* Eyebrow: the sound menu at rest, a status word otherwise. */
+.eyebrow {
+  height: 24px; padding: 0; border: none; background: transparent;
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: var(--fs-micro); font-weight: var(--fw-strong); letter-spacing: var(--ls-caps); text-transform: uppercase;
+  color: var(--accent); white-space: nowrap;
+}
+.eyebrow .icon { width: 14px; height: 14px; stroke-width: 2; }
+.eyebrow__dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); margin: 0 1px 0 3px; }
+
+/* The hint line. One line, never wraps; it swaps text with a 240 ms cross-fade. */
+.hint {
+  font-size: var(--fs-body); color: var(--ink-2); line-height: 1.35;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-height: 18px;
+  transition: opacity calc(var(--t-text) / 2) var(--ease-ui);
+}
+.hint b { color: var(--ink); font-weight: var(--fw-strong); }
+.hint kbd, .player__main .kbd {
+  font: inherit; font-size: 10.5px; font-weight: var(--fw-medium); color: var(--ink-2);
+  min-width: 0; border: 1px solid var(--line-2); border-radius: 6px; padding: 0 5px; line-height: 16px; display: inline-block;
+}
+.hint[data-swapping] { opacity: 0; }
+
+.rest-message { font-size: var(--fs-ui); color: var(--ink); line-height: 1.4; }
+
+/* ---------- the light: start, minutes left, wind down, resume ---------- */
+
+.ripple {
+  position: relative; width: var(--ripple); height: var(--ripple); flex: none;
+  border: none; background: transparent; padding: 0; border-radius: 50%;
+}
+.ripple__disc { position: absolute; inset: 0; border-radius: 50%; background-color: var(--surface); opacity: 0; transition: opacity 240ms var(--ease-ui), background-color var(--t-material) var(--ease-sound); }
+.ripple__ring { position: absolute; border-radius: 50%; border: 1px solid var(--ring-1); inset: 0; }
+.ripple__ring--inner { inset: var(--ripple-ring-gap); border-color: var(--ring-2); }
+.ripple__core {
+  position: absolute; inset: 18px; border-radius: 50%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background-color: var(--accent); color: var(--on-accent);
+  box-shadow: 0 0 26px rgba(var(--accent-rgb), 0.3);
+}
+.ripple__core .icon { width: 26px; height: 26px; }
+.ripple__num { font-size: var(--fs-num); font-weight: var(--fw-strong); line-height: 1; font-variant-numeric: tabular-nums; }
+.ripple__unit { font-size: 10.5px; color: var(--ink-2); margin-top: 3px; }
+.ripple:hover .ripple__core { box-shadow: 0 0 34px rgba(var(--accent-rgb), 0.42); }
+.ripple:active .ripple__core { transform: scale(0.97); transition: transform var(--t-press) var(--ease-ui); }
+.ripple:focus-visible { outline-offset: 3px; }
+
+/* Playing: the light becomes a window onto the minutes. */
+.ripple[data-state='playing'] .ripple__core {
+  background-color: var(--accent-wash); color: var(--ink); border: 1.5px solid var(--accent);
+  box-shadow: 0 0 30px rgba(var(--accent-rgb), 0.22);
+}
+.ripple[data-state='playing'] .ripple__ring { border-color: rgba(var(--accent-rgb), 0.32); }
+.ripple[data-state='playing'] .ripple__ring--inner { border-color: rgba(var(--accent-rgb), 0.55); }
+/* Winding, resting, ending: dimmer rings, the hum or the minutes of a timed rest. */
+.ripple:is([data-state='winding'], [data-state='resting'], [data-state='ending']) .ripple__core {
+  background-color: var(--raised); color: var(--accent); border: 1.5px solid rgba(var(--accent-rgb), 0.6); box-shadow: none;
+}
+.ripple:is([data-state='winding'], [data-state='resting'], [data-state='ending']) .ripple__ring { border-color: rgba(var(--accent-rgb), 0.1); }
+.ripple:is([data-state='winding'], [data-state='resting'], [data-state='ending']) .ripple__ring--inner { border-color: rgba(var(--accent-rgb), 0.22); }
+/* Paused by a notice: quiet, grey. */
+.ripple[data-state='paused'] .ripple__core { background-color: var(--raised); color: var(--ink-2); border: 1.5px solid var(--line-2); box-shadow: none; }
+.ripple[data-state='paused'] .ripple__ring { border-color: rgba(var(--accent-rgb), 0.1); }
+.ripple[data-state='paused'] .ripple__ring--inner { border-color: rgba(var(--accent-rgb), 0.18); }
+.ripple[aria-disabled='true'] .ripple__core { transform: none; }
+
+/* The only ambient motion in the window: Meditate, playing. A soft halo whose
+   opacity breathes with the drone's filter sweep (--sweep-period, about 30 s).
+   The halo itself fades in and out with the session's colours, never in a frame. */
+@keyframes tw-glow { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+.ripple__glow {
+  position: absolute; inset: -4px; border-radius: 50%; pointer-events: none;
+  opacity: 0; transition: opacity var(--t-material) var(--ease-sound);
+}
+.ripple__halo {
+  position: absolute; inset: 0; border-radius: 50%;
+  box-shadow: 0 0 22px rgba(var(--accent-rgb), 0.25);
+  transition: box-shadow var(--t-material) var(--ease-sound);
+  animation: tw-glow var(--sweep-period, 30s) var(--ease-sound) var(--sweep-delay, 0s) infinite;
+  animation-play-state: paused;
+}
+[data-mode='meditate'] .ripple[data-state='playing'] .ripple__glow { opacity: 1; }
+[data-mode='meditate'] .ripple[data-state='playing'] .ripple__halo { animation-play-state: running; }
+[data-window-hidden='true'] .ripple__halo { animation-play-state: paused !important; }
+@media (prefers-reduced-motion: reduce) { .ripple__halo { animation: none !important; opacity: 0.7; } }
+
+/* ---------- chips, buttons, icon buttons ---------- */
+
+.chip {
+  height: var(--chip-h); padding: 0 11px; border-radius: var(--r-chip);
+  background-color: var(--raised); border: 1px solid var(--line-2); color: var(--ink);
+  font-size: var(--fs-small); font-weight: var(--fw-medium);
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+}
+.chip .icon { width: 15px; height: 15px; }
+.chip--action { background-color: transparent; border-color: var(--accent); font-weight: var(--fw-strong); padding-right: 6px; gap: 7px; }
+/* Hover and open answer at once (140 ms), on an outline of their own, whatever pace the
+   session's colours are changing at. */
+.chip, .player__main .btn { position: relative; }
+.chip::after, .player__main .btn::after {
+  content: ''; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
+  border: 1px solid var(--track); opacity: 0; transition: opacity var(--t-ui) var(--ease-ui);
+}
+.chip:hover::after, .player__main .btn:hover::after { opacity: 1; }
+.chip[aria-expanded='true']::after { opacity: 1; border-color: var(--accent-hi); }
+.player__main .btn--primary::after { border-color: var(--accent-hi); }
+
+.player__main .btn {
+  height: var(--chip-h); min-height: 0; padding: 0 12px; border-radius: var(--r-chip);
+  border: 1px solid var(--line-2); background-color: transparent; color: var(--ink);
+  font-size: var(--fs-small); font-weight: var(--fw-medium);
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px; white-space: nowrap;
+}
+.player__main .btn--primary { background-color: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: var(--fw-strong); }
+.player__main .btn:active { transform: scale(0.98); transition: transform var(--t-press) var(--ease-ui); }
+
+.player__main .icon-btn {
+  width: var(--target-min); height: var(--target-min); border-radius: 50%;
+  border: none; background-color: transparent; color: var(--ink-3);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.player__main .icon-btn .icon { width: 18px; height: 18px; stroke-width: 1.7; }
+.player__main .icon-btn:hover { color: var(--ink); background-color: var(--raised); }
+.player__main .icon-btn[aria-expanded='true'] { color: var(--accent); background-color: var(--accent-wash); }
+
+/* ---------- notices: in place of the name, hint line and chips ---------- */
+
+.notice { display: flex; flex-direction: column; gap: var(--s1); transition: opacity var(--t-notice) var(--ease-out); }
+.notice[data-leaving] { opacity: 0; }
+.notice__title { font-size: var(--fs-title); font-weight: var(--fw-strong); line-height: 1.25; color: var(--ink); }
+.notice__title--small { font-size: 15px; }
+.notice__sub { font-size: var(--fs-body); color: var(--ink-2); line-height: 1.35; }
+.notice__actions { display: flex; gap: 6px; margin-top: 5px; }
+.rest-message + .notice, .rest-message ~ .player__actions { margin-top: 9px; }
+
+/* ---------- volume, adjusting: a slider in place of the chips ---------- */
+
+.volume-row { display: flex; align-items: center; gap: 8px; height: var(--chip-h); margin-top: 7px; color: var(--ink-2); }
+.volume-row__icon { display: inline-flex; }
+.volume-row__value { width: 34px; text-align: right; font-size: var(--fs-small); }
+.range { -webkit-appearance: none; appearance: none; flex: 1; width: 100%; height: 24px; background: transparent; margin: 0; }
+.range::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 2px;
+  background: linear-gradient(to right, var(--accent) 0 calc(var(--v, 0.5) * 100%), var(--track) calc(var(--v, 0.5) * 100%) 100%);
+}
+.range::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: var(--ink); border: none; }
+
+/* ---------- mini mode: the light alone ----------
+   'fading'  everything but the light fades out (or back in), 240 ms;
+   'on'      the window has shrunk to the light, top-left corner fixed, so the
+             light keeps exactly the place it has in the player. */
+
+.app[data-mini] .player__ground { opacity: 0; transition: opacity 240ms var(--ease-ui); }
+.player__ground { transition: opacity 240ms var(--ease-ui), background-color var(--t-material) var(--ease-sound), border-color var(--t-material) var(--ease-sound); }
+.app[data-mini] .player__body, .app[data-mini] .player__sheet { opacity: 0; pointer-events: none; }
+.app[data-mini] .ripple__disc { opacity: 1; }
+.app[data-mini='on'] .player__body,
+.app[data-mini='on'] .player__sheet { visibility: hidden; }
+/* The main row keeps its place; only the light shows, so nothing else may catch the pointer. */
+.app[data-mini='on'] .player__main { pointer-events: none; }
+.app[data-mini='on'] .ripple { pointer-events: auto; }
+/* Glows would be cut off by the small window's edge; in mini mode the light keeps them inside its rim. */
+.app[data-mini='on'] .ripple__core, .app[data-mini='on'] .ripple:hover .ripple__core { box-shadow: none; }
+.app[data-mini] .ripple__glow { inset: 0; }
+.app[data-mini] .ripple__halo { box-shadow: inset 0 0 16px rgba(var(--accent-rgb), 0.3); }
+/* The focus ring stays inside the small window. */
+.app[data-mini='on'] .ripple:focus-visible { outline-offset: -3px; }

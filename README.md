@@ -9,7 +9,7 @@
 <p align="center"><a href="https://tonewell.space">tonewell.space</a></p>
 
 <p align="center">
-  <img src="docs/screenshots/mini-playing.png" width="400" alt="The Tonewell mini player during a 20-minute Deep Theta session">
+  <img src="docs/screenshots/mini-playing.png" width="380" alt="The Tonewell player during a 20-minute Deep Theta session: 20 minutes left, Wind down and volume">
 </p>
 
 Tonewell plays an endless, slowly changing bed of sound: a warm drone that
@@ -25,11 +25,15 @@ hours of unobtrusive sound alongside your other apps.
 
 ## What it's like
 
-- **A mini player and the menu bar.** Tonewell lives in a 400 × 184 window
-  you can tuck in a corner, or in the menu bar with no window at all.
-- **Wind it up.** The round well is the play button and the timer. Drag
-  around it to wind the session in 5-minute steps, then click to start.
-  It runs down once a minute, never ticking seconds at you.
+- **A small player and the menu bar.** Tonewell lives in a 380 × 156
+  window you can tuck in a corner, or in the menu bar with no window at
+  all. ⌘M shrinks it to just its light, a 112 px circle that floats where
+  you put it; click the light to bring the player back.
+- **One light.** The round light starts the sound. While playing it shows
+  the minutes left, redrawn once a minute, never ticking seconds at you.
+- **Help where you look.** One line under the sound's name describes it
+  at rest and explains whatever you point at, right away: no tooltips to
+  wait for.
 - **One way to stop, and it's gentle.** Wind down (or Esc) settles
   everything into a low, warm hum in about six seconds and waits there.
   Resume or End when you're ready. Nothing ever cuts off. The keyboard's
@@ -59,9 +63,9 @@ hours of unobtrusive sound alongside your other apps.
   streaks) stay in one file on your Mac.
 
 <p align="center">
-  <img src="docs/screenshots/mini-resting.png" width="400" alt="Resting after Wind down: 'A low hum, nothing else. Stay as long as you like.'">
+  <img src="docs/screenshots/mini-resting.png" width="380" alt="Resting after Wind down: 'A low hum, nothing else. Stay as long as you like.'">
   &nbsp;
-  <img src="docs/screenshots/mini-focus.png" width="400" alt="Focus mode with Brown Noise Desk ready to start">
+  <img src="docs/screenshots/mini-focus.png" width="380" alt="Focus mode with Brown Noise Desk ready to start">
 </p>
 
 <p align="center">
@@ -130,7 +134,9 @@ and Linux builds should work but haven't been tried.
   AudioWorklet for textures, and a lookahead scheduler on the audio clock.
 - `src/session` holds the session: start, wind down, resume, end, timers,
   device changes.
-- `src/ui` is the mini player, the well, the panel and the menu-bar menu.
+- `src/ui` is the player, the panel beneath it and the menu-bar menu.
+  `src/styles/tokens.css` holds the colours, type and timing for both
+  modes and every phase of a session.
 - `src/visuals`, `src/learn` and `src/settings` are the other windows.
   `src/visuals/renderer.ts` holds the visuals' brightness limits for
   both the app and the website.
@@ -149,13 +155,9 @@ The reasoning behind the bigger choices is in
 
 - The visuals' four original scenes and the sound's first shape come from
   the Chrysanthemum prototype, kept in [`prototype/`](prototype/).
-- Type: [Cormorant Garamond](https://github.com/CatharsisFonts/Cormorant)
-  by The Cormorant Project Authors and
-  [Atkinson Hyperlegible Next](https://github.com/googlefonts/atkinson-hyperlegible-next)
-  by the Braille Institute of America, both under the SIL Open Font License
-  (copies in `src/fonts/`). The website uses
-  [Figtree](https://github.com/erikdkennedy/figtree) by The Figtree Project
-  Authors, also under the SIL Open Font License (copy in `site/fonts/`).
+- Type: [Figtree](https://github.com/erikdkennedy/figtree) by The Figtree
+  Project Authors, under the SIL Open Font License (copies in `src/fonts/`
+  and `site/fonts/`).
 - Built with [Tauri](https://tauri.app).
 
 Tonewell isn't affiliated with any meditation organization and doesn't teach

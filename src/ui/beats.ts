@@ -21,14 +21,18 @@ export interface BeatChoice {
   use: 'meditate' | 'focus';
   /** A few words on what it's commonly used for. */
   purpose: string;
+  /** Its name in the player, by purpose. */
+  name: string;
+  /** For the hint line: the beat in bold, then a few words. */
+  hint: { b: string; t: string };
 }
 
 export const BEAT_CHOICES: readonly BeatChoice[] = [
-  { id: '6', label: 'Theta, 6 Hz', hz: 6, use: 'meditate', purpose: 'meditation' },
-  { id: 'settle', label: 'Settle, 10 to 6 Hz', hz: 6, from: 10, use: 'meditate', purpose: 'eases from alpha into theta' },
-  { id: '2', label: 'Delta, 2 Hz', hz: 2, use: 'meditate', purpose: 'deep rest; can make you drowsy' },
-  { id: '10', label: 'Alpha, 10 Hz', hz: 10, use: 'focus', purpose: 'calm, unhurried focus' },
-  { id: '15', label: 'Low beta, 15 Hz', hz: 15, use: 'focus', purpose: 'alert work' },
+  { id: '6', label: 'Theta, 6 Hz', hz: 6, use: 'meditate', purpose: 'meditation', name: 'Theta', hint: { b: '6 Hz.', t: 'A steady theta beat.' } },
+  { id: 'settle', label: 'Settle, 10 to 6 Hz', hz: 6, from: 10, use: 'meditate', purpose: 'eases from alpha into theta', name: 'Settle', hint: { b: '10 → 6 Hz', t: 'over a few minutes.' } },
+  { id: '2', label: 'Delta, 2 Hz', hz: 2, use: 'meditate', purpose: 'deep rest; can make you drowsy', name: 'Deep rest', hint: { b: '2 Hz.', t: 'Can make you drowsy.' } },
+  { id: '10', label: 'Alpha, 10 Hz', hz: 10, use: 'focus', purpose: 'calm, unhurried focus', name: 'Calm focus', hint: { b: '10 Hz.', t: 'Alpha, for unhurried work.' } },
+  { id: '15', label: 'Low beta, 15 Hz', hz: 15, use: 'focus', purpose: 'alert work', name: 'Alert work', hint: { b: '15 Hz.', t: 'Low beta, for brisk tasks.' } },
 ];
 
 const near = (a: number, b: number) => Math.abs(a - b) < 0.05;
@@ -52,6 +56,21 @@ export function beatShort(p: SoundParams): string {
   if (!p.beatOn) return 'Off';
   if (p.rampOn) return `${fmtHz(p.rampFrom)}→${fmtHz(p.beatHz)} Hz`;
   return `${fmtHz(p.beatHz)} Hz`;
+}
+
+/** The beat by purpose, as the player names it: "Settle", "Yours", "No beat". */
+export function beatName(p: SoundParams): string {
+  if (!p.beatOn) return 'No beat';
+  return currentChoice(p)?.name ?? 'Yours';
+}
+
+/** The current beat for the hint line: the beat in bold, then a few words. The chip already shows its name. */
+export function beatHint(p: SoundParams): { b: string; t: string } {
+  if (!p.beatOn) return { b: 'No beat.', t: 'Click to choose one.' };
+  const c = currentChoice(p);
+  if (!c) return { b: p.rampOn ? `${fmtHz(p.rampFrom)} → ${fmtHz(p.beatHz)} Hz,` : `${fmtHz(p.beatHz)} Hz,`, t: 'set by hand.' };
+  // A glide says how long it takes, which is a setting of its own.
+  return c.from !== undefined ? { b: `${fmtHz(c.from)} → ${fmtHz(c.hz)} Hz`, t: `over ${p.rampMin} min.` } : c.hint;
 }
 
 /** A sentence describing the setting, for labels and screen readers. */

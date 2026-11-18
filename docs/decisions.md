@@ -269,3 +269,39 @@ picture (in Night Drone, fourteen times more beat in the output's low
 band than in the bed's). Tapping the bed keeps the beat out by
 construction, not by smoothing.
 
+## 19. The player is a light, a line of help and two chips
+
+**Decision.** The player is 380 × 156: a round light that starts, shows
+the minutes and winds down; the mode and the sound's name; one hint line;
+and two chips that change with the session (length and beat at rest,
+Wind down and volume while playing, Resume and End while resting).
+The hint line is the help: it describes the sound at rest and explains
+whatever the pointer or keyboard focus is on, at once. Rest messages and
+notices take the place of the name, hint and chips, so the window never
+changes size for them. Notices rank (paused > stopped > muted >
+output > softer): a lower one waits behind a higher one and is dropped if
+it no longer applies when its turn comes. Figtree replaces both earlier
+typefaces, and the colours follow the mode and the phase, changing over
+8 s while sound plays and 240 ms otherwise.
+
+**Why.** The first player had three sliders, a beat chip and a well you
+wound by dragging, which few people would find. Help that waits for a
+tooltip doesn't help someone with eyes half closed. Length, beat and
+sound each now have one place, named the same way everywhere.
+
+## 20. Mini mode is the light alone
+
+**Decision.** ⌘M, the player's mini tool or the right-click menu shrinks
+the window to its light: a 112 px circle that stays exactly where the
+light was. Everything else fades over 240 ms, then the window resizes
+around the light with the system's own animation while CSS holds the
+light still on screen; growing back runs the same steps in reverse.
+Clicking the light opens the player again (a click never stops the
+sound there); dragging it, from the rim or with any press that moves,
+moves the window. Esc, the menu bar, media keys and headphone buttons
+work as always. Mini mode is remembered across launches.
+
+**Why.** During work the useful glance is "is it on, how long is left",
+and the light already answers both. A smaller window that keeps the same
+object in the same place is calmer than a different compact layout, and
+nothing in it can be pressed by accident.

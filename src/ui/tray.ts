@@ -47,7 +47,7 @@ export function trayMenu(session: Session, s: Snapshot, shortcuts: boolean): Men
     // The same grouped choices as the mini player's Beat menu.
     submenu(`Beat: ${beatShort(s.params)}`, beatMenuNodes(s.params, s.mode)),
     sep,
-    item('show', 'Show mini player'),
+    item('show', 'Show player'),
     item('visuals', 'Open visuals'),
     item('learn', 'Learn'),
     item('settings', 'Settings…'),

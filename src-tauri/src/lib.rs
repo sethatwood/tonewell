@@ -126,10 +126,67 @@ fn media_state(app: AppHandle, state: String, title: String) {
     media::set_state(&app, state, title);
 }
 
-/// Resize the mini player keeping its top edge in place. On macOS this uses
-/// the system's own frame animation, unless `animate` is false (Reduce motion).
+/// Resize the player and move its top-left corner by (`dx`, `dy`) logical
+/// pixels in one step. On macOS this is the system's own frame animation
+/// (unless `animate` is false, for Reduce motion), and the call returns once
+/// the animation has finished, so the page can fade in step with it. The
+/// shadow is redrawn for the new shape: round in mini mode.
 #[tauri::command]
-fn resize_player(window: tauri::WebviewWindow, height: f64, animate: bool) -> Result<(), String> {
+async fn resize_player(
+    window: tauri::WebviewWindow,
+    height: f64,
+    width: Option<f64>,
+    dx: Option<f64>,
+    dy: Option<f64>,
+    animate: bool,
+) -> Result<(), String> {
+    let (dx, dy) = (dx.unwrap_or(0.0), dy.unwrap_or(0.0));
+    #[cfg(target_os = "macos")]
+    {
+        let ns = window.ns_window().map_err(|e| e.to_string())? as usize;
+        let (done, wait) = std::sync::mpsc::channel();
+        window
+            .run_on_main_thread(move || unsafe {
+                use objc2_app_kit::NSWindow;
+                let w: &NSWindow = &*(ns as *const NSWindow);
+                let mut frame = w.frame();
+                // Cocoa measures from the bottom of the screen; keep the arithmetic top-down.
+                let top = frame.origin.y + frame.size.height;
+                if let Some(width) = width {
+                    frame.size.width = width;
+                }
+                frame.size.height = height;
+                frame.origin.x += dx;
+                frame.origin.y = top - dy - height;
+                w.setFrame_display_animate(frame, true, animate);
+                w.invalidateShadow();
+                let _ = done.send(());
+            })
+            .map_err(|e| e.to_string())?;
+        // Wait for the animation on a blocking thread, leaving the async workers free.
+        let _ = tauri::async_runtime::spawn_blocking(move || wait.recv_timeout(std::time::Duration::from_secs(2))).await;
+        Ok(())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = animate;
+        let scale = window.scale_factor().map_err(|e| e.to_string())?;
+        let size = window.inner_size().map_err(|e| e.to_string())?;
+        let pos = window.outer_position().map_err(|e| e.to_string())?;
+        let w = width.unwrap_or(size.width as f64 / scale);
+        window.set_size(tauri::LogicalSize::new(w, height)).map_err(|e| e.to_string())?;
+        if dx != 0.0 || dy != 0.0 {
+            window
+                .set_position(tauri::LogicalPosition::new(pos.x as f64 / scale + dx, pos.y as f64 / scale + dy))
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+}
+
+/// Redraw the window's shadow after the page changes its shape.
+#[tauri::command]
+fn refresh_shadow(window: tauri::WebviewWindow) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         let ns = window.ns_window().map_err(|e| e.to_string())? as usize;
@@ -137,22 +194,14 @@ fn resize_player(window: tauri::WebviewWindow, height: f64, animate: bool) -> Re
             .run_on_main_thread(move || unsafe {
                 use objc2_app_kit::NSWindow;
                 let w: &NSWindow = &*(ns as *const NSWindow);
-                let mut frame = w.frame();
-                let top = frame.origin.y + frame.size.height;
-                frame.size.height = height;
-                frame.origin.y = top - height;
-                w.setFrame_display_animate(frame, true, animate);
+                w.invalidateShadow();
             })
             .map_err(|e| e.to_string())
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = animate;
-        let size = window.inner_size().map_err(|e| e.to_string())?;
-        let scale = window.scale_factor().map_err(|e| e.to_string())?;
-        window
-            .set_size(tauri::LogicalSize::new(size.width as f64 / scale, height))
-            .map_err(|e| e.to_string())
+        let _ = window;
+        Ok(())
     }
 }
 
@@ -216,7 +265,9 @@ fn quit_now(app: AppHandle) {
 }
 
 /// The app menu. Its Quit goes through the fade-out like the menu-bar Quit; the
-/// default menu's Quit would end the process at once, mid-sound.
+/// default menu's Quit would end the process at once, mid-sound. macOS only:
+/// elsewhere there is no app menu, and the window has its own close button.
+#[cfg(target_os = "macos")]
 fn app_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let about = PredefinedMenuItem::about(app, Some("About Tonewell"), None)?;
     let settings = MenuItem::with_id(app, "app:settings", "Settings…", true, Some("CmdOrCtrl+,"))?;
@@ -257,7 +308,8 @@ fn app_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     Menu::with_items(app, &[&tonewell, &edit, &window])
 }
 
-/// Close the focused window. The mini player only hides: the sound keeps going.
+/// Close the focused window. The player only hides: the sound keeps going.
+#[cfg(target_os = "macos")]
 fn close_focused(app: &AppHandle) {
     for (label, w) in app.webview_windows() {
         if w.is_focused().unwrap_or(false) {
@@ -305,7 +357,7 @@ pub fn run() {
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_opener::init())
         .manage(Awake::default())
-        .invoke_handler(tauri::generate_handler![tray_update, set_keep_awake, audio_output, mic_in_use, media_state, resize_player, set_dock_visible, quit_now, debug_flags, debug_log])
+        .invoke_handler(tauri::generate_handler![tray_update, set_keep_awake, audio_output, mic_in_use, media_state, resize_player, refresh_shadow, set_dock_visible, quit_now, debug_flags, debug_log])
         .setup(|app| {
             let handle = app.handle().clone();
             #[cfg(target_os = "macos")]

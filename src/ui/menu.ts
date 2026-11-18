@@ -15,13 +15,13 @@ export const check = (id: string, label: string, checked: boolean, enabled = tru
 export const sep: MenuNode = { kind: 'separator' };
 export const submenu = (label: string, children: MenuNode[], enabled = true): MenuNode => ({ kind: 'submenu', label, children, enabled });
 
-/** Show a menu under `anchor` and resolve with the chosen id (or null). */
-export async function popup(nodes: MenuNode[], anchor: HTMLElement): Promise<string | null> {
-  if (isTauri) return nativePopup(nodes, anchor);
-  return htmlPopup(nodes, anchor);
+/** Show a menu under `anchor`, or at `at` (a right-click), and resolve with the chosen id (or null). */
+export async function popup(nodes: MenuNode[], anchor: HTMLElement, at?: { x: number; y: number }): Promise<string | null> {
+  if (isTauri) return nativePopup(nodes, anchor, at);
+  return htmlPopup(nodes, anchor, at);
 }
 
-async function nativePopup(nodes: MenuNode[], anchor: HTMLElement): Promise<string | null> {
+async function nativePopup(nodes: MenuNode[], anchor: HTMLElement, at?: { x: number; y: number }): Promise<string | null> {
   const { Menu, MenuItem, CheckMenuItem, PredefinedMenuItem, Submenu } = await import('@tauri-apps/api/menu');
   const { LogicalPosition } = await import('@tauri-apps/api/dpi');
   let chosen: string | null = null;
@@ -44,21 +44,21 @@ async function nativePopup(nodes: MenuNode[], anchor: HTMLElement): Promise<stri
   };
   const menu = await Menu.new({ items: await build(nodes) });
   const r = anchor.getBoundingClientRect();
-  await menu.popup(new LogicalPosition(r.left, r.bottom + 4));
+  await menu.popup(at ? new LogicalPosition(at.x, at.y) : new LogicalPosition(r.left, r.bottom + 4));
   // popup() resolves when the menu closes; an action may arrive just after.
   const result = await Promise.race([picked, new Promise<null>((r) => setTimeout(() => r(null), 80))]);
   return result ?? chosen;
 }
 
-function htmlPopup(nodes: MenuNode[], anchor: HTMLElement): Promise<string | null> {
+function htmlPopup(nodes: MenuNode[], anchor: HTMLElement, at?: { x: number; y: number }): Promise<string | null> {
   return new Promise((resolve) => {
     document.querySelector('.pop')?.remove();
     const pop = document.createElement('div');
     pop.className = 'pop';
     pop.setAttribute('role', 'menu');
     const r = anchor.getBoundingClientRect();
-    pop.style.left = `${Math.max(8, Math.min(r.left, innerWidth - 248))}px`;
-    pop.style.top = `${r.bottom + 4}px`;
+    pop.style.left = `${Math.max(8, Math.min(at?.x ?? r.left, innerWidth - 248))}px`;
+    pop.style.top = `${at?.y ?? r.bottom + 4}px`;
     const close = (id: string | null) => {
       pop.remove();
       removeEventListener('pointerdown', outside, true);
