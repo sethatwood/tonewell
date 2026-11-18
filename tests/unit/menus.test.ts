@@ -14,7 +14,7 @@ function ids(nodes: MenuNode[]): string[] {
   return out;
 }
 
-const KNOWN = /^(go|wind|resume|end|status|show|visuals|learn|settings|quit|keep-playing|preset-save-as|preset-save|preset-rename|preset-duplicate|preset-delete|preset-revert|mode:(meditate|focus)|preset:.+|length:(\d+|open)|volume:(up|down|\d+)|beat:(off|more|learn|custom|settle|header-(meditate|focus)|[\d.]+))$/;
+const KNOWN = /^(go|wind|resume|end|status|show|visuals|learn|settings|quit|check-updates|update-restart|keep-playing|preset-save-as|preset-save|preset-rename|preset-duplicate|preset-delete|preset-revert|mode:(meditate|focus)|preset:.+|length:(\d+|open)|volume:(up|down|\d+)|beat:(off|more|learn|custom|settle|header-(meditate|focus)|[\d.]+))$/;
 
 describe('menus', () => {
   const session = new Session();
@@ -33,7 +33,7 @@ describe('menus', () => {
 
   it('only uses actions the app knows how to handle', () => {
     const s = snap({ phase: 'playing' });
-    for (const id of [...ids(trayMenu(session, s, true)), ...ids(lengthMenu(s)), ...ids(beatMenu(s)), ...ids(presetMenu(session, s))]) {
+    for (const id of [...ids(trayMenu(session, s, true)), ...ids(trayMenu(session, s, true, '9.9.9')), ...ids(lengthMenu(s)), ...ids(beatMenu(s)), ...ids(presetMenu(session, s))]) {
       expect(id).toMatch(KNOWN);
     }
   });

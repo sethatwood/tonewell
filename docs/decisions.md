@@ -167,9 +167,10 @@ binaural beat plays as a monaural one, since binaural needs headphones.
 ## 11. Everything stays on the Mac
 
 **Decision.** Settings, presets and session preferences live in one JSON
-file in the app's data folder (Tauri store plugin). There are no accounts,
-no network requests and no analytics. The only links that leave the app
-are Learn's source links, which open in the default browser when clicked.
+file in the app's data folder (Tauri store plugin). There are no accounts
+and no analytics. The only network use is the daily update check and
+downloading an update (see 21), and the only links that leave the app are Learn's source links,
+which open in the default browser when clicked.
 
 ## 12. Learn cites what it says
 
@@ -305,3 +306,37 @@ work as always. Mini mode is remembered across launches.
 and the light already answers both. A smaller window that keeps the same
 object in the same place is calmer than a different compact layout, and
 nothing in it can be pressed by accident.
+
+## 21. Updates arrive quietly and install only between sessions
+
+**Decision.** Once a day, 60 s after launch and then hourly whether a day
+has passed, the app fetches https://tonewell.space/updates/latest.json
+(Tauri's updater plugin). The request is a fixed URL with the plugin's
+user agent: no version, platform or identifier. A newer version downloads
+in the background from the project's GitHub release (whose file names
+say the platform, and whose download counts GitHub publishes), waits in
+the app's cache folder, and must carry a signature from the Tonewell
+updater key that names that version. It installs when the app quits, where that needs no password (macOS
+when the app and its folder are writable, the AppImage in a writable
+folder, the per-user Windows installer run silently; never a .deb), or
+when the person presses Restart on the player's notice. Nothing about
+updates appears while sound plays, and no session can start while
+Restart installs. Settings has a switch that stops the checks and drops
+a waiting update, a Check now button and the current version; the menu
+bar and app menus offer Check for updates. Windows gets only the
+per-user installer: an .msi installs for all users and couldn't update
+without an administrator.
+
+Releases are published by `scripts/release.sh` on the Mac that holds the
+keys: CI builds Windows and Linux bundles for a version tag into a draft
+GitHub release, and the script adds the notarized universal Mac build,
+signs every update, publishes the release and writes the manifest into
+`site/`, which goes live when pushed.
+
+**Why.** Friends testing the beta should get fixes without having to
+remember to download them, and a menu-bar app is rarely quit, so a quit
+alone would install too seldom. An update that restarts the app mid-sit
+would break the rule that nothing startles, so it waits. The manifest
+lives on the project's own domain so the binaries can move without
+stranding installed copies, and keeping the updater key off CI means
+publishing an update needs the release Mac, not just push access.

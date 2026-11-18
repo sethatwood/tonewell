@@ -1,14 +1,17 @@
 // The mini player window. It owns the sound (the session), mirrors itself
 // into the menu bar, and feeds the optional Visuals window.
 
-import { Session, type Phase } from './session/session';
+import { Session, type Notice, type Phase } from './session/session';
 import { Player, handleMenuId, type PlayerActions } from './ui/player';
 import { Panel } from './ui/panel';
-import { invalidateTray, trayError, updateTray } from './ui/tray';
+import { invalidateTray, trayError, updateTray, type TrayOptions } from './ui/tray';
 import { check, item, popup, sep, submenu } from './ui/menu';
 import { h } from './ui/controls';
 import { currentWindow, emitTo, invoke, isTauri, isWindowOpen, listen, openWindow } from './platform/bridge';
 import { flushNow } from './platform/store';
+import {
+  checkDue, checkForUpdate, loadUpdateMemory, onUpdateStatus, restartToUpdate, saveUpdateMemory, updateStatus, type UpdateStatus,
+} from './platform/updates';
 import { chordRatio } from './visuals/chords';
 import { GLOBAL_SHORTCUTS, loadSettings, patchSettings, type AppSettings } from './settings/model';
 
@@ -265,7 +268,8 @@ async function applySettings(next: AppSettings, save = false): Promise<void> {
   if (isTauri && registeredShortcuts !== settings.shortcutsEnabled) await setShortcuts(settings.shortcutsEnabled);
   session.setDucked(micBusy && settings.softenForCalls);
   if (isTauri && prev?.showInDock !== settings.showInDock) void invoke('set_dock_visible', { visible: settings.showInDock }).catch(() => undefined);
-  void updateTray(session, session.snapshot(), { shortcuts: settings.shortcutsEnabled, showTime: settings.showTimeInMenuBar });
+  if (isTauri && prev?.checkUpdates && !settings.checkUpdates) void stopUpdates();
+  void updateTray(session, session.snapshot(), trayOptions());
 }
 
 async function setShortcuts(on: boolean): Promise<void> {
@@ -317,6 +321,14 @@ async function runAction(action: string): Promise<void> {
       return openLearn();
     case 'settings':
       return actions.openSettings();
+    case 'check-updates':
+      return checkUpdatesNow();
+    case 'update-restart':
+      return restartForUpdate();
+    case 'update-later':
+      // Not again until the next daily check.
+      updateLaterUntil = Infinity;
+      return;
     default:
       await handleMenuId(action, session, actions, ask);
   }
@@ -368,10 +380,14 @@ function render(): void {
   setSounding(s.phase);
   player.render(s);
   if (expanded) panel.render(s);
-  if (settings) void updateTray(session, s, { shortcuts: settings.shortcutsEnabled, showTime: settings.showTimeInMenuBar });
+  if (settings) void updateTray(session, s, trayOptions());
   if (s.phase === 'ready' && lastPhase !== 'ready' && s.timerDone && !s.notice) {
     session.setNotice({ kind: 'done', text: `Done, ${s.prefs.minutes ?? ''} min.`.replace(' , min', ''), ttl: 10 });
   }
+  // A session just ended: an update that came in meanwhile waits behind anything else showing.
+  if (s.phase === 'ready' && lastPhase !== 'ready') offerUpdate();
+  // One started: a check asked for before it reports nothing more.
+  if (s.phase !== 'ready') checkAsked = false;
   if (s.phase === 'playing' && !settings?.firstRunDone && settings) {
     void applySettings({ ...settings, firstRunDone: true }, true);
     player.firstRun = false;
@@ -380,6 +396,123 @@ function render(): void {
 }
 
 session.addEventListener('change', render);
+session.addEventListener('notice-action', (e) => void runAction((e as CustomEvent<string>).detail));
+
+// ---------- updates ----------
+
+let update: UpdateStatus | null = null;
+/** The person said Later: don't offer the update again before this. */
+let updateLaterUntil = 0;
+/** The person asked to check, so say how it went. */
+let checkAsked = false;
+
+function trayOptions(): TrayOptions {
+  return {
+    shortcuts: settings.shortcutsEnabled,
+    showTime: settings.showTimeInMenuBar,
+    update: update?.state === 'ready' ? update.version : null,
+  };
+}
+
+/**
+ * Say something about updates. Only while nothing plays or is starting, so
+ * nothing about updates ever appears mid-session; it waits behind any other
+ * notice, and a newer one replaces it.
+ */
+function updateNote(n: Omit<Notice, 'kind'>): void {
+  if (!session.idle) return;
+  session.clearNotices(['update']);
+  session.setNotice({ kind: 'update', ...n });
+}
+
+/** Offer the downloaded update, only while nothing plays, and not after Later. */
+function offerUpdate(): void {
+  if (update?.state !== 'ready' || !update.version) return;
+  if (session.holdStarts || Date.now() < updateLaterUntil) return;
+  updateNote({
+    text: `Version ${update.version} is ready.`,
+    sub: update.installsAtQuit ? 'Or it installs when you quit.' : undefined,
+    actions: [{ id: 'update-restart', label: 'Restart' }, { id: 'update-later', label: 'Later' }],
+  });
+}
+
+function onUpdate(next: UpdateStatus): void {
+  const prev = update;
+  update = next;
+  // Remember when a check got an answer; a failed one is retried within the hour.
+  if (next.checkedAt && next.checkedAt !== prev?.checkedAt && (next.state === 'latest' || next.state === 'ready')) {
+    void saveUpdateMemory({ lastCheck: next.checkedAt });
+  }
+  if (checkAsked) {
+    if (next.state === 'downloading') updateNote({ text: `Downloading version ${next.version}…` });
+    else if (next.state === 'latest') updateNote({ text: 'Tonewell is up to date.', ttl: 5 });
+    else if (next.state === 'failed') updateNote({ text: 'Couldn’t check for updates.', sub: 'Tonewell will try again later.', ttl: 8 });
+    if (next.state !== 'checking' && next.state !== 'downloading') checkAsked = false;
+  }
+  if (next.state === 'ready' && prev?.state !== 'ready') offerUpdate();
+  if (settings) void updateTray(session, session.snapshot(), trayOptions());
+}
+
+async function checkUpdatesNow(): Promise<void> {
+  if (update?.state === 'checking' || update?.state === 'downloading') return;
+  updateLaterUntil = 0;
+  if (update?.state === 'ready') return offerUpdate();
+  // Asked during a session, it still looks; the menu bar shows what it found.
+  checkAsked = session.idle;
+  updateNote({ text: 'Checking for updates…' });
+  const result = await checkForUpdate();
+  // No status event arrived (the call itself failed): settle it from the answer.
+  if (checkAsked && result) onUpdate({ ...result, current: result.current || update?.current || '' });
+}
+
+/** The daily look, when the person allows it. Development builds never look on their own. */
+async function scheduledCheck(): Promise<void> {
+  if (!settings?.checkUpdates || import.meta.env.DEV) return;
+  if (update?.state === 'checking' || update?.state === 'downloading') return;
+  const { lastCheck } = await loadUpdateMemory();
+  if (!checkDue(lastCheck, Date.now())) return;
+  // A new day: an update set aside with Later, or one that failed to install, is offered again.
+  updateLaterUntil = 0;
+  await checkForUpdate();
+}
+
+async function restartForUpdate(): Promise<void> {
+  if (update?.state !== 'ready' || !session.idle) return;
+  // From here until the app restarts, nothing may start a session.
+  session.holdStarts = true;
+  updateNote({ text: 'Installing the update…' });
+  await session.quit();
+  await flushNow();
+  try {
+    await restartToUpdate();
+  } catch {
+    session.holdStarts = false;
+    updateNote({ text: 'The update didn’t install.', sub: 'Tonewell will offer it again tomorrow.', ttl: 10 });
+  }
+}
+
+/** Turning updates off also drops one already downloaded, so nothing installs at quit. */
+async function stopUpdates(): Promise<void> {
+  session.clearNotices(['update']);
+  const status = await invoke<UpdateStatus>('update_discard').catch(() => undefined);
+  if (status) onUpdate(status);
+}
+
+async function startUpdates(): Promise<void> {
+  const status = await updateStatus();
+  if (!status) return;
+  update = status;
+  const memory = await loadUpdateMemory();
+  if (memory.lastVersion && memory.lastVersion !== status.current) {
+    updateNote({ text: `Updated to version ${status.current}.`, ttl: 8 });
+  }
+  if (memory.lastVersion !== status.current) await saveUpdateMemory({ lastVersion: status.current });
+  // Not at launch, which may be login, before the network is up.
+  setTimeout(() => {
+    void scheduledCheck();
+    setInterval(() => void scheduledCheck(), 3600 * 1000);
+  }, 60 * 1000);
+}
 
 // For the browser checks in development only; never in a built app.
 if (import.meta.env.DEV) Object.assign(window, { __tonewell: { session, player, setMini, setExpanded } });
@@ -450,7 +583,7 @@ setInterval(async () => {
 // The menu bar's minutes-left title counts down (updates only when the text changes).
 setInterval(() => {
   if (settings?.showTimeInMenuBar && session.phase === 'playing') {
-    void updateTray(session, session.snapshot(), { shortcuts: settings.shortcutsEnabled, showTime: true });
+    void updateTray(session, session.snapshot(), { ...trayOptions(), showTime: true });
   }
 }, 15000);
 
@@ -476,10 +609,12 @@ async function boot(): Promise<void> {
       session.output = out;
       render();
     }
+    // Before anything can ask for a check, so no answer is missed.
+    await onUpdateStatus(onUpdate);
     await listen<string>('tray-action', (id) => {
       // The system flips a clicked check mark by itself; resend the true state.
       invalidateTray();
-      void runAction(id).finally(() => void updateTray(session, session.snapshot(), { shortcuts: settings.shortcutsEnabled, showTime: settings.showTimeInMenuBar }));
+      void runAction(id).finally(() => void updateTray(session, session.snapshot(), trayOptions()));
     });
     await listen('audio-output', (c) => session.onOutputChange(c as Parameters<Session['onOutputChange']>[0]));
     await listen<boolean>('mic-in-use', (busy) => {
@@ -506,6 +641,7 @@ async function boot(): Promise<void> {
       visualsOpen = false;
     });
     await listen<string>('remote-action', (a) => void runAction(a));
+    await startUpdates();
     const w = await currentWindow();
     await w?.show();
     await w?.setFocus();
@@ -523,6 +659,7 @@ async function diagnostics(): Promise<void> {
   if (!flags) return;
   if (flags.preset) session.setPreset(flags.preset);
   if (flags.minutes !== null && flags.minutes !== undefined) session.setLength(flags.minutes > 0 ? flags.minutes : null);
+  const log = (line: string) => void invoke('debug_log', { line });
   for (const name of (flags.open ?? '').split(',').filter(Boolean)) {
     try {
       if (name === 'expand') await setExpanded(true);
@@ -532,11 +669,18 @@ async function diagnostics(): Promise<void> {
       else if (name === 'visuals') await openVisuals();
       else if (name === 'learn') await openLearn();
       else if (name === 'settings') actions.openSettings();
+      else if (name === 'update-check') await checkUpdatesNow();
+      else if (name === 'update-restart') await restartForUpdate();
+      else if (name === 'quit') {
+        await session.quit();
+        await flushNow();
+        await invoke('quit_now');
+      }
+      if (name.startsWith('update')) log(`${name}: ${JSON.stringify(update)}`);
     } catch (err) {
       void invoke('debug_log', { line: `open ${name} failed: ${String(err)}` });
     }
   }
-  const log = (line: string) => void invoke('debug_log', { line });
   if (flags.log) {
     let lastWall = Date.now();
     setInterval(() => {

@@ -6,9 +6,33 @@ import { GLOBAL_SHORTCUTS, clearLog, loadLog, loadSettings, patchSettings, type 
 import { h, scale, switchControl } from '../ui/controls';
 import { emit, isTauri, listen, openExternal } from '../platform/bridge';
 import { reloadDoc } from '../platform/store';
+import { checkForUpdate, onUpdateStatus, updateStatus, type UpdateStatus } from '../platform/updates';
 
 document.title = 'Tonewell Settings';
 document.documentElement.dataset.mode = 'meditate';
+
+/** Repaints the Updates section; replaced each time the page is rebuilt. */
+let paintUpdate: (u: UpdateStatus) => void = () => undefined;
+
+function updateText(u: UpdateStatus): string {
+  const when = u.checkedAt ? new Intl.DateTimeFormat(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(u.checkedAt)) : null;
+  switch (u.state) {
+    case 'checking':
+      return 'Checking…';
+    case 'downloading':
+      return `Downloading version ${u.version}…`;
+    case 'ready':
+      return u.installsAtQuit
+        ? `Version ${u.version} is ready. It installs when you quit Tonewell, or restart from the player now.`
+        : `Version ${u.version} is ready. Restart from the player to install it.`;
+    case 'failed':
+      return 'Couldn’t check for updates just now. Tonewell will try again later.';
+    case 'latest':
+      return `Version ${u.current}, the latest.${when ? ` Checked ${when}.` : ''}`;
+    default:
+      return `Version ${u.current}.`;
+  }
+}
 
 async function autostart() {
   if (!isTauri) return null;
@@ -75,6 +99,16 @@ async function boot(): Promise<void> {
     renderLog([]);
   });
 
+  const updates = switchControl('Check for updates', s.checkUpdates, (on) => void save({ checkUpdates: on }), true);
+  const updateLine = h('p', { class: 'set-help', role: 'status' });
+  const checkNow = h('button', { class: 'btn quiet' }, 'Check now');
+  checkNow.addEventListener('click', () => void checkForUpdate());
+  paintUpdate = (u) => {
+    updateLine.textContent = updateText(u);
+    (checkNow as HTMLButtonElement).disabled = u.state === 'checking' || u.state === 'downloading' || u.state === 'ready';
+  };
+  void updateStatus().then((u) => u && paintUpdate(u));
+
   const repo = h('a', { href: 'https://github.com/sethatwood/tonewell' }, 'github.com/sethatwood/tonewell');
   repo.addEventListener('click', (e) => {
     e.preventDefault();
@@ -109,6 +143,11 @@ async function boot(): Promise<void> {
         logBox,
         h('div', {}, clear),
       ),
+      h('section', {}, h('h2', {}, 'Updates'),
+        row('Check for updates', 'Once a day, Tonewell asks tonewell.space whether there’s a new version. If there is, it downloads it from GitHub in the background and installs it when you quit or restart, never during a session. Neither sends anything about you or how you use Tonewell. Turning this off also drops an update that’s waiting.', updates.el),
+        updateLine,
+        h('div', {}, checkNow),
+      ),
       h('section', {}, h('h2', {}, 'About'),
         h('p', {}, 'Tonewell makes every sound on your Mac as it plays: nothing is recorded, nothing is streamed, and nothing about how you use it leaves this computer.'),
         h('p', {}, 'Open source under the MIT License: ', repo, '.'),
@@ -133,4 +172,7 @@ async function rebuild(): Promise<void> {
   rendering = false;
 }
 
-void boot().then(() => listen('settings-changed', () => void rebuild()));
+void boot().then(async () => {
+  await listen('settings-changed', () => void rebuild());
+  await onUpdateStatus((u) => paintUpdate(u));
+});

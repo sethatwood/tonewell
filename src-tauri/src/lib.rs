@@ -1,9 +1,11 @@
 //! Tonewell's native shell: the menu-bar item, keep-awake, output-device
-//! watching, window lifecycle and a quit that lets the sound fade first.
+//! watching, window lifecycle, updates, and a quit that lets the sound fade
+//! first.
 //! All sound is made in the main window's webview; see src/audio.
 
 mod media;
 mod output;
+mod updates;
 
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -235,8 +237,10 @@ fn audio_output() -> Option<output::OutputInfo> {
 
 /// Diagnostics for automated checks: TONEWELL_AUTOSTART=1 starts a session at launch,
 /// TONEWELL_HIDE=1 hides the window once it has started, TONEWELL_PRESET picks a preset,
-/// TONEWELL_LOG=1 prints the scheduler's health every ten seconds, TONEWELL_OPEN opens
-/// windows by name (expand, visuals, learn, settings), TONEWELL_MINUTES sets the session length.
+/// TONEWELL_LOG=1 prints the scheduler's health every ten seconds, TONEWELL_MINUTES sets the
+/// session length. TONEWELL_OPEN runs steps in order: open a window or mode (expand, visuals,
+/// learn, settings, mini, full), wait two seconds (pause), check for and download an update
+/// (update-check), install it and restart (update-restart), or quit as ⌘Q does (quit).
 #[tauri::command]
 fn debug_flags() -> serde_json::Value {
     let on = |k: &str| std::env::var(k).map(|v| v == "1").unwrap_or(false);
@@ -257,9 +261,12 @@ fn debug_log(line: String) {
 
 static QUITTING: AtomicBool = AtomicBool::new(false);
 
-/// Called by the page once the sound has faded out.
+/// Called by the page once the sound has faded out. A downloaded update
+/// installs now, so the next launch is the new version.
 #[tauri::command]
-fn quit_now(app: AppHandle) {
+async fn quit_now(app: AppHandle) {
+    let handle = app.clone();
+    let _ = tauri::async_runtime::spawn_blocking(move || updates::install_at_quit(&handle)).await;
     QUITTING.store(true, Ordering::SeqCst);
     app.exit(0);
 }
@@ -270,6 +277,7 @@ fn quit_now(app: AppHandle) {
 #[cfg(target_os = "macos")]
 fn app_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let about = PredefinedMenuItem::about(app, Some("About Tonewell"), None)?;
+    let updates = MenuItem::with_id(app, "app:check-updates", "Check for Updates…", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "app:settings", "Settings…", true, Some("CmdOrCtrl+,"))?;
     let quit = MenuItem::with_id(app, "app:quit", "Quit Tonewell", true, Some("CmdOrCtrl+Q"))?;
     let sep = || PredefinedMenuItem::separator(app);
@@ -279,6 +287,7 @@ fn app_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         true,
         &[
             &about,
+            &updates,
             &sep()?,
             &settings,
             &sep()?,
@@ -330,6 +339,7 @@ fn show_main(app: &AppHandle) {
 /// Ask the page to fade out, and quit anyway if it doesn't answer in time.
 fn request_quit(app: &AppHandle) {
     if app.emit_to("main", "quit-requested", ()).is_err() {
+        updates::install_at_quit(app);
         QUITTING.store(true, Ordering::SeqCst);
         app.exit(0);
         return;
@@ -337,6 +347,8 @@ fn request_quit(app: &AppHandle) {
     let handle = app.clone();
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(4000));
+        // Waits for an update that is installing, rather than cutting it off.
+        updates::install_at_quit(&handle);
         QUITTING.store(true, Ordering::SeqCst);
         handle.exit(0);
     });
@@ -356,8 +368,26 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Awake::default())
-        .invoke_handler(tauri::generate_handler![tray_update, set_keep_awake, audio_output, mic_in_use, media_state, resize_player, refresh_shadow, set_dock_visible, quit_now, debug_flags, debug_log])
+        .manage(updates::Updates::default())
+        .invoke_handler(tauri::generate_handler![
+            tray_update,
+            set_keep_awake,
+            audio_output,
+            mic_in_use,
+            media_state,
+            resize_player,
+            refresh_shadow,
+            set_dock_visible,
+            quit_now,
+            debug_flags,
+            debug_log,
+            updates::update_status,
+            updates::update_check,
+            updates::update_restart,
+            updates::update_discard
+        ])
         .setup(|app| {
             let handle = app.handle().clone();
             #[cfg(target_os = "macos")]
@@ -368,6 +398,10 @@ pub fn run() {
                     "app:close" => close_focused(app),
                     "app:settings" => {
                         let _ = app.emit_to("main", "remote-action", "settings".to_string());
+                    }
+                    "app:check-updates" => {
+                        show_main(app);
+                        let _ = app.emit_to("main", "remote-action", "check-updates".to_string());
                     }
                     _ => {}
                 });

@@ -48,18 +48,20 @@ export const PREFS_DEFAULT: Record<Mode, SessionPrefs> = {
 };
 
 /** What a notice is about, which sets its priority and how the player words it. */
-export type NoticeKind = 'unplugged' | 'interrupted' | 'slept' | 'muted' | 'back' | 'output' | 'softer' | 'done';
+export type NoticeKind = 'unplugged' | 'interrupted' | 'slept' | 'muted' | 'back' | 'output' | 'softer' | 'done' | 'update';
 
 export interface Notice {
   kind: NoticeKind;
   text: string;
+  /** A second, quieter line. */
+  sub?: string;
   actions?: Array<{ id: string; label: string }>;
   /** Seconds before it clears itself; absent for notices that wait for the user. */
   ttl?: number;
 }
 
-/** When two notices meet, the higher one shows and the lower one waits behind it. */
-const NOTICE_RANK: Record<NoticeKind, number> = { unplugged: 5, interrupted: 5, slept: 4, muted: 3, back: 2, output: 2, softer: 1, done: 0 };
+/** When two notices meet, the higher one shows and the lower one waits behind it. An update always waits. */
+const NOTICE_RANK: Record<NoticeKind, number> = { unplugged: 5, interrupted: 5, slept: 4, muted: 3, back: 2, output: 2, softer: 1, done: 0, update: -1 };
 
 const MUTED: Notice = { kind: 'muted', text: 'Your Mac’s sound is muted.' };
 
@@ -135,6 +137,8 @@ export class Session extends EventTarget {
   /** Paused because the output disappeared: timers and breaks are frozen until the person resumes. */
   private pausedForDevice = false;
   private starting = false;
+  /** An update is installing and the app is about to restart: no session may start. */
+  holdStarts = false;
   private lastGo = -Infinity;
   /** Audio time the current block started (the session start, or the end of the last Focus break). */
   private blockStart = 0;
@@ -426,7 +430,7 @@ export class Session extends EventTarget {
   }
 
   async start(): Promise<void> {
-    if (this.phase !== 'ready' || this.starting) return;
+    if (this.phase !== 'ready' || this.starting || this.holdStarts) return;
     this.starting = true;
     try {
       await this.startNow();
@@ -457,7 +461,8 @@ export class Session extends EventTarget {
     this.applyBeatPlan(0);
     this.armSafetyNet();
     this.phase = 'playing';
-    this.clearNotices(['unplugged', 'interrupted', 'slept', 'done']);
+    // Nothing about updates shows during a session.
+    this.clearNotices(['unplugged', 'interrupted', 'slept', 'done', 'update']);
     if (this.muted && this.notice?.kind !== 'muted') this.setNotice(MUTED);
     this.updateKeepAwake();
     this.emit();
@@ -789,7 +794,14 @@ export class Session extends EventTarget {
     this.emit();
   }
 
+  /** Idle in the full sense: ready, and no session on its way in. */
+  get idle(): boolean {
+    return this.phase === 'ready' && !this.starting;
+  }
+
   async noticeAction(id: string): Promise<void> {
+    // Sound is about to start: an update offer waiting behind this notice must not flash up first.
+    if (id === 'start' || id === 'resume') this.clearNotices(['update']);
     this.setNotice(null);
     this.deviceLost = null;
     if (id === 'resume') {
@@ -799,6 +811,9 @@ export class Session extends EventTarget {
       await this.start();
     } else if (id === 'end') {
       this.end();
+    } else {
+      // Not the session's to handle (an update's Restart, say): pass it on.
+      this.dispatchEvent(new CustomEvent('notice-action', { detail: id }));
     }
   }
 
@@ -833,7 +848,7 @@ export class Session extends EventTarget {
   }
 
   /** Clear any notice of these kinds, showing or waiting: what an action has just resolved. */
-  private clearNotices(kinds: NoticeKind[]): void {
+  clearNotices(kinds: NoticeKind[]): void {
     if (this.pendingNotice && kinds.includes(this.pendingNotice.notice.kind)) this.pendingNotice = null;
     if (this.notice && kinds.includes(this.notice.kind)) this.setNotice(null);
   }

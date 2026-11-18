@@ -175,7 +175,7 @@ export function restMessage(s: Snapshot): string | null {
 }
 
 const NOTICE_WORD: Record<Notice['kind'], string> = {
-  unplugged: 'Paused', interrupted: 'Paused', slept: 'Stopped', muted: 'Muted', back: 'Back', output: 'Output', softer: 'Softer', done: 'Done',
+  unplugged: 'Paused', interrupted: 'Paused', slept: 'Stopped', muted: 'Muted', back: 'Back', output: 'Output', softer: 'Softer', done: 'Done', update: 'Update',
 };
 
 function noticeSub(n: Notice, s: Snapshot): string | null {
@@ -191,7 +191,7 @@ function noticeSub(n: Notice, s: Snapshot): string | null {
     case 'softer':
       return 'Back to full when the call ends.';
     default:
-      return null;
+      return n.sub ?? null;
   }
 }
 

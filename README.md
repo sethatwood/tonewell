@@ -58,9 +58,13 @@ hours of unobtrusive sound alongside your other apps.
 - **Kind to work.** Focus presets are steady and barely use the CPU (about
   1% of one core for Brown Noise Desk). Turn on "Soften during calls" and
   the sound dips whenever an app is using a microphone.
-- **Private by construction.** No accounts, no network, no analytics.
-  Settings, presets and an optional session log (date, length, preset; no
-  streaks) stay in one file on your Mac.
+- **Private by construction.** No accounts and no analytics. Settings,
+  presets and an optional session log (date, length, preset; no streaks)
+  stay in one file on your Mac. The app goes online only to ask
+  tonewell.space once a day whether there's a new version, and to download
+  it from GitHub when there is. Neither sends anything about you, and both
+  can be turned off. Updates install when you quit or choose to restart,
+  never mid-session.
 
 <p align="center">
   <img src="docs/screenshots/mini-resting.png" width="380" alt="Resting after Wind down: 'A low hum, nothing else. Stay as long as you like.'">
@@ -107,8 +111,14 @@ npm run tauri build     # build Tonewell.app
 npm run dmg             # wrap it in a disk image
 ```
 
-The app isn't signed or notarized yet, so the first time you open a build
-from elsewhere, right-click it and choose Open.
+A build you make yourself isn't signed, so the first time you open it on
+another Mac, right-click it and choose Open.
+
+Releases come from `npm run release` ([scripts/release.sh](scripts/release.sh)
+lists the steps). Pushing a version tag has CI build the Windows and Linux
+bundles into a draft release; the script then adds the signed, notarized Mac
+build, signs every update with the updater key, publishes the release and
+writes `site/updates/latest.json`, which installed copies read once a day.
 
 Checks:
 

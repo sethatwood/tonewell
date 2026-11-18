@@ -1,5 +1,7 @@
-# Unsigned Windows and Linux builds for testing. macOS is built and signed
-# by hand, so it is not built here.
+# Windows and Linux bundles. A v* tag puts them in a draft release, which
+# scripts/release.sh completes on a Mac: it adds the signed, notarized Mac
+# build, signs every update and publishes. The signing keys stay on that Mac,
+# so this workflow needs no secrets.
 name: Desktop builds
 
 on:
@@ -20,10 +22,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Only the per-user installer: it updates itself silently, where
+          # an .msi installs for all users and needs an administrator.
           - platform: windows
             os: windows-latest
-            bundles: nsis,msi
-            extensions: exe msi
+            bundles: nsis
+            extensions: exe
           # Tauri's documented Linux runner. Its older glibc lets the
           # AppImage run on more distributions.
           - platform: linux
@@ -145,5 +149,5 @@ jobs:
             gh release upload "$TAG" out/* --clobber
           else
             gh release create "$TAG" out/* --draft --verify-tag --title "Tonewell $TAG" \
-              --notes "Unsigned test builds for Windows and Linux. Windows will warn that the installer is from an unknown publisher."
+              --notes "Download Tonewell from https://tonewell.space. The Windows installer isn't signed yet, so Windows may say it's from an unknown publisher: choose More info, then Run anyway."
           fi

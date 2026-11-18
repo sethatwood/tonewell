@@ -21,6 +21,8 @@ export interface AppSettings {
   /** Lower the sound while any app is using a microphone (a call). */
   softenForCalls: boolean;
   showInDock: boolean;
+  /** Look for a new version once a day and download it in the background. */
+  checkUpdates: boolean;
 }
 
 export const SETTINGS_DEFAULT: AppSettings = {
@@ -38,6 +40,7 @@ export const SETTINGS_DEFAULT: AppSettings = {
   visualsPalette: 0,
   softenForCalls: false,
   showInDock: true,
+  checkUpdates: true,
 };
 
 /** One finished session, kept only on this Mac. */

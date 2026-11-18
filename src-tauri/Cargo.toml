@@ -21,6 +21,7 @@ tauri-plugin-global-shortcut = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2"
 keepawake = "0.6"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -39,3 +40,4 @@ block2 = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSString", "NSDictionary", "NSValue", "NSGeometry"] }
 objc2-app-kit = { version = "0.3", features = ["NSWindow", "NSResponder"] }
 objc2-media-player = { version = "0.3", features = ["MPRemoteCommandCenter", "MPRemoteCommand", "MPRemoteCommandEvent", "MPNowPlayingInfoCenter", "MPMediaItem", "block2"] }
+

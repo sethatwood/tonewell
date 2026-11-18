@@ -16,6 +16,7 @@
     "perf": "node scripts/audio-perf.mjs",
     "screenshots": "node scripts/screenshots.mjs",
     "dmg": "sh scripts/make-dmg.sh",
+    "release": "bash scripts/release.sh",
     "site": "vite build --config vite.site.config.ts",
     "site:og": "node scripts/site-og.mjs",
     "site:scenes": "node scripts/site-scenes.mjs"

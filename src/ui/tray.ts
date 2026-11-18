@@ -9,7 +9,14 @@ import { beatMenuNodes, beatShort } from './beats';
 
 const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
 
-export function trayMenu(session: Session, s: Snapshot, shortcuts: boolean): MenuNode[] {
+export interface TrayOptions {
+  shortcuts: boolean;
+  showTime: boolean;
+  /** A downloaded update's version, waiting to install. */
+  update: string | null;
+}
+
+export function trayMenu(session: Session, s: Snapshot, shortcuts: boolean, update: string | null = null): MenuNode[] {
   const nodes: MenuNode[] = [];
   const hint = (label: string, keys: string) => (shortcuts ? `${label}    ${keys}` : label);
   if (s.phase === 'ready') {
@@ -51,6 +58,8 @@ export function trayMenu(session: Session, s: Snapshot, shortcuts: boolean): Men
     item('visuals', 'Open visuals'),
     item('learn', 'Learn'),
     item('settings', 'Settings…'),
+    // Restarting is offered only while nothing plays; otherwise it installs at quit.
+    update ? item('update-restart', `Restart to update to ${update}`, s.phase === 'ready') : item('check-updates', 'Check for updates…'),
     sep,
     item('quit', 'Quit Tonewell'),
   );
@@ -66,8 +75,8 @@ export function invalidateTray(): void {
 /** The last menu-bar update error, for diagnostics. */
 export let trayError: string | null = null;
 
-export async function updateTray(session: Session, s: Snapshot, opts: { shortcuts: boolean; showTime: boolean }): Promise<void> {
-  const menu = trayMenu(session, s, opts.shortcuts);
+export async function updateTray(session: Session, s: Snapshot, opts: TrayOptions): Promise<void> {
+  const menu = trayMenu(session, s, opts.shortcuts, opts.update);
   const icon = s.phase === 'playing' ? 'playing' : s.phase === 'ready' ? 'ready' : 'resting';
   const title = opts.showTime && s.phase === 'playing' && s.remaining !== null ? `${Math.ceil(s.remaining / 60)}m` : null;
   const tooltip = s.phase === 'ready' ? 'Tonewell' : `Tonewell: ${s.preset.name}`;
