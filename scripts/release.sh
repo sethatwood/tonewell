@@ -54,7 +54,9 @@ grep -q "^version = \"$VERSION\"$" src-tauri/Cargo.toml || die "src-tauri/Cargo.
 [ -f "$KEY" ] || die "no updater key at $KEY"
 TAURI_SIGNING_PRIVATE_KEY_PASSWORD=$(security find-generic-password -s tonewell-updater -w) || die "no updater key password in the keychain"
 export TAURI_SIGNING_PRIVATE_KEY_PASSWORD
-rustup target list --installed | grep -q x86_64-apple-darwin || die "run: rustup target add x86_64-apple-darwin"
+# Matches are tested on captured output: "cmd | grep -q" can fail under
+# pipefail when grep exits early and the command gets SIGPIPE.
+[[ "$(rustup target list --installed)" == *x86_64-apple-darwin* ]] || die "run: rustup target add x86_64-apple-darwin"
 [ "$(gh release view "$TAG" -R "$REPO" --json isDraft --jq .isDraft 2>/dev/null)" = true ] ||
   die "no draft release $TAG; push the tag and wait for the Desktop builds workflow"
 
@@ -78,7 +80,7 @@ echo "==> Building the Mac app (Apple silicon and Intel), signed"
 APPLE_SIGNING_IDENTITY="$IDENTITY" npm run tauri build -- --target universal-apple-darwin --bundles app
 APP="src-tauri/target/universal-apple-darwin/release/bundle/macos/Tonewell.app"
 codesign --verify --deep --strict "$APP"
-codesign -dvv "$APP" 2>&1 | grep -q "flags=0x10000(runtime)" || die "the app is not signed with the hardened runtime"
+[[ "$(codesign -dvv "$APP" 2>&1)" == *"(runtime)"* ]] || die "the app is not signed with the hardened runtime"
 ARCHS=$(lipo -archs "$APP/Contents/MacOS/tonewell")
 [[ "$ARCHS" == *x86_64* && "$ARCHS" == *arm64* ]] || die "the app is not universal ($ARCHS)"
 
