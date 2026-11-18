@@ -108,8 +108,9 @@
   box-shadow: 0 0 26px rgba(var(--accent-rgb), 0.3);
 }
 .ripple__core .icon { width: 26px; height: 26px; }
+.ripple__content { display: flex; flex-direction: column; align-items: center; }
 .ripple__num { font-size: var(--fs-num); font-weight: var(--fw-strong); line-height: 1; font-variant-numeric: tabular-nums; }
-.ripple__unit { font-size: 10.5px; color: var(--ink-2); margin-top: 3px; }
+.ripple__unit { font-size: 10.5px; color: var(--ink-2); margin-top: 3px; white-space: nowrap; }
 .ripple:hover .ripple__core { box-shadow: 0 0 34px rgba(var(--accent-rgb), 0.42); }
 .ripple:active .ripple__core { transform: scale(0.97); transition: transform var(--t-press) var(--ease-ui); }
 .ripple:focus-visible { outline-offset: 3px; }
