@@ -91,3 +91,23 @@ describe('restarting to update', () => {
   });
 });
 
+
+describe('shortcuts on Windows', () => {
+  it('are written the way Windows writes them', async () => {
+    const real = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+    Object.defineProperty(globalThis, 'navigator', { value: { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edg/131' }, configurable: true });
+    try {
+      const { vi } = await import('vitest');
+      vi.resetModules();
+      const os = await import('../../src/platform/os');
+      expect(os.isMac).toBe(false);
+      expect(os.computer).toBe('computer');
+      expect(os.keys('⌘M')).toBe('Ctrl+M');
+      expect(os.keys('⇧⌘V')).toBe('Ctrl+Shift+V');
+      expect(os.keys('⌃⌥⌘Space')).toBe('Ctrl+Alt+Win+Space');
+      expect(os.keys('⌘↑')).toBe('Ctrl+↑');
+    } finally {
+      if (real) Object.defineProperty(globalThis, 'navigator', real);
+    }
+  });
+});

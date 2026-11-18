@@ -6,6 +6,7 @@ import { invoke } from '../platform/bridge';
 import { check, item, sep, submenu, type MenuNode } from './menu';
 import { LENGTHS, lengthLabel } from './player';
 import { beatMenuNodes, beatShort } from './beats';
+import { keys } from '../platform/os';
 
 const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
 
@@ -18,7 +19,7 @@ export interface TrayOptions {
 
 export function trayMenu(session: Session, s: Snapshot, shortcuts: boolean, update: string | null = null): MenuNode[] {
   const nodes: MenuNode[] = [];
-  const hint = (label: string, keys: string) => (shortcuts ? `${label}    ${keys}` : label);
+  const hint = (label: string, mac: string) => (shortcuts ? `${label}    ${keys(mac)}` : label);
   if (s.phase === 'ready') {
     nodes.push(item('go', hint(`Start ${s.preset.name} (${lengthLabel(s.prefs.minutes).toLowerCase()})`, '⌃⌥⌘Space')));
   } else {

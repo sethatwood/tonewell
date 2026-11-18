@@ -26,7 +26,7 @@ export const CARDS: Card[] = [
       'The effect has limits. Classic experiments found that binaural beats come through most clearly with tones around 400–500 Hz. They grow faint as the tones approach 1000 Hz, and nobody reliably hears them above about 1500 Hz [1][2][3]. The beat rate has a ceiling too: slow differences sound like a wobble, faster ones like a slight roughness, and somewhere around 30–35 Hz the effect disappears [2][5].',
       'Headphones matter because each ear has to get only its own tone. With speakers, both ears hear both tones; the tones mix in the air and you get an ordinary “monaural” beat instead, a real pulse in loudness that one ear alone can hear [1]. Monaural beats and isochronic tones (a single tone gently switched on and off) work through speakers. In brain recordings, monaural beats usually produce a bigger response than binaural ones [4].',
       'One nice detail: a quiet bed of noise can make a binaural beat easier to hear [1].',
-      { note: 'In Tonewell, the beat’s carrier sits on a harmonic of the drone (about 100–200 Hz), so it blends into the sound rather than standing apart from it. When your Mac is playing through speakers, a binaural beat is played as a monaural one.' },
+      { note: 'In Tonewell, the beat’s carrier sits on a harmonic of the drone (about 100–200 Hz), so it blends into the sound rather than standing apart from it. When Tonewell is playing through speakers, a binaural beat is played as a monaural one.' },
     ],
     sources: [
       { text: 'Oster, G. (1973). Auditory beats in the brain. Scientific American, 229(4), 94–102.', url: 'https://doi.org/10.1038/scientificamerican1073-94' },

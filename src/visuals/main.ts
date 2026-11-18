@@ -16,6 +16,7 @@ import { SoundFollower } from './follow';
 import { emitTo, listen, currentWindow, isTauri } from '../platform/bridge';
 import { loadSettings, patchSettings, type AppSettings } from '../settings/model';
 import { h } from '../ui/controls';
+import { computer } from '../platform/os';
 
 interface Frame {
   /** The drone's chord as a small whole-number ratio, for the Harmonograph. */
@@ -291,7 +292,7 @@ async function boot(): Promise<void> {
     settings = await patchSettings({ calmVisuals: settings.calmVisuals, visualsWarned: true });
   }
   if (!vis) {
-    document.body.append(h('p', { style: 'color:#aaa;padding:24px' }, 'This Mac could not start WebGL, so the visuals can’t run here. The sound is unaffected.'));
+    document.body.append(h('p', { style: 'color:#aaa;padding:24px' }, `This ${computer} could not start WebGL, so the visuals can’t run here. The sound is unaffected.`));
     return;
   }
   document.body.append(buildBar());

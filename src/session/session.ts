@@ -17,6 +17,7 @@ import { BUILTIN_PRESETS, presetParams, type Mode, type Preset } from '../preset
 import { loadDoc, patchDoc } from '../platform/store';
 import { invoke } from '../platform/bridge';
 import { appendLog } from '../settings/model';
+import { computer } from '../platform/os';
 
 export type { Mode } from '../presets/builtin';
 export type Phase = 'ready' | 'playing' | 'winding' | 'resting' | 'ending';
@@ -63,7 +64,7 @@ export interface Notice {
 /** When two notices meet, the higher one shows and the lower one waits behind it. An update always waits. */
 const NOTICE_RANK: Record<NoticeKind, number> = { unplugged: 5, interrupted: 5, slept: 4, muted: 3, back: 2, output: 2, softer: 1, done: 0, update: -1 };
 
-const MUTED: Notice = { kind: 'muted', text: 'Your Mac’s sound is muted.' };
+const MUTED: Notice = { kind: 'muted', text: `Your ${computer}’s sound is muted.` };
 
 export interface Snapshot {
   phase: Phase;
@@ -707,7 +708,7 @@ export class Session extends EventTarget {
       this.engine?.silence();
       void this.ctx?.suspend();
       this.finish();
-      this.setNotice({ kind: 'slept', text: 'Stopped while your Mac slept.', actions: [{ id: 'start', label: 'Start again' }] });
+      this.setNotice({ kind: 'slept', text: `Stopped while your ${computer} slept.`, actions: [{ id: 'start', label: 'Start again' }] });
       return;
     }
     if (!this.ctx || !this.isRunning() || this.pausedForDevice) return;

@@ -12,6 +12,8 @@ import { h } from './controls';
 import { uiIcon, type UiIcon } from './icons';
 import { check, item, popup, sep, submenu, type MenuNode } from './menu';
 import { BEAT_CHOICES, beatHint, beatLong, beatMenuNodes, beatName, choiceParams } from './beats';
+// Windows writes shortcuts longer (Ctrl+Shift+V), so a few hints say less there to fit the line.
+import { isMac, keys } from '../platform/os';
 
 export interface PlayerActions {
   /** Show or hide the full controls under the player. */
@@ -362,8 +364,8 @@ export class Player {
     // Tools: shown when the pointer is over the window or focus is inside it
     this.shapeBtn = this.tool('shape', 'Shape the sound', () => actions.toggleExpanded(), () => [{ b: 'Shape:' }, { t: 'warmer, stiller, more rain.' }]);
     this.shapeBtn.setAttribute('aria-expanded', 'false');
-    const visualsBtn = this.tool('visuals', 'Open visuals', () => actions.openVisuals(), () => [{ b: 'Visuals,' }, { t: 'in their own window.' }, { k: '⇧⌘V' }]);
-    const miniBtn = this.tool('mini', 'Shrink to the light', () => actions.toggleMini(), () => [{ b: 'Mini player:' }, { t: 'just the light.' }, { k: '⌘M' }]);
+    const visualsBtn = this.tool('visuals', 'Open visuals', () => actions.openVisuals(), () => [{ b: 'Visuals,' }, { t: isMac ? 'in their own window.' : 'in a window.' }, { k: keys('⇧⌘V') }]);
+    const miniBtn = this.tool('mini', 'Shrink to the light', () => actions.toggleMini(), () => [{ b: isMac ? 'Mini player:' : 'Mini:' }, { t: 'just the light.' }, { k: keys('⌘M') }]);
     miniBtn.setAttribute('aria-keyshortcuts', 'Meta+M');
     const tools = h('div', { class: 'player__tools' }, this.shapeBtn, visualsBtn, miniBtn);
     const top = h('div', { class: 'player__top', 'data-tauri-drag-region': true }, this.eyebrowBtn, this.eyebrowText, tools);
@@ -475,7 +477,7 @@ export class Player {
       if (l.press === 'end') this.session.end();
       else void this.session.go();
     });
-    this.hint(r, () => (this.mini ? [{ b: 'Open the player.' }, { k: '⌘M' }] : (this.light?.hint ?? [])));
+    this.hint(r, () => (this.mini ? [{ b: 'Open the player.' }, { k: keys('⌘M') }] : (this.light?.hint ?? [])));
   }
 
   private paintLight(s: Snapshot): void {
@@ -689,7 +691,7 @@ export class Player {
             className: 'chip', label: `Beat: ${beatLong(s.params)}`, key: 'beat',
             hint: () => {
               const h = beatHint(this.snap?.params ?? s.params);
-              return [{ b: h.b }, { t: h.t }, { k: '⌘B' }];
+              return [{ b: h.b }, { t: h.t }, { k: keys('⌘B') }];
             },
             build: (b) => {
               b.setAttribute('aria-haspopup', 'menu');
@@ -711,7 +713,7 @@ export class Player {
           },
           {
             className: 'chip', label: this.volumeLabel(s), key: 'volume',
-            hint: () => [{ b: 'Volume.' }, { k: '⌘↑' }, { k: '⌘↓' }, { t: 'from anywhere.' }],
+            hint: () => [{ b: 'Volume.' }, { k: keys('⌘↑') }, { k: keys('⌘↓') }, ...(isMac ? [{ t: 'from anywhere.' }] : [])],
             build: (b) => {
               this.volumeChip = b;
               b.setAttribute('aria-haspopup', 'true');

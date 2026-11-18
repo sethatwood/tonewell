@@ -1,6 +1,7 @@
 //! Watches the system's default audio output so the app can react when
-//! headphones disconnect or the output switches (macOS only; elsewhere the
-//! watcher reports nothing and the app simply keeps playing).
+//! headphones disconnect or the output switches: CoreAudio on macOS, the
+//! Windows Core Audio API on Windows. Elsewhere the watcher reports nothing
+//! and the app simply keeps playing. Microphone use is only watched on macOS.
 
 use serde::Serialize;
 
@@ -199,6 +200,129 @@ mod mac {
     }
 }
 
+#[cfg(windows)]
+mod win {
+    use super::OutputInfo;
+    use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
+    use windows::Win32::Foundation::PROPERTYKEY;
+    use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
+    use windows::Win32::Media::Audio::{
+        DEVICE_STATE_ACTIVE, DigitalAudioDisplayDevice, Headphones, Headset, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator,
+        PKEY_AudioEndpoint_FormFactor, Speakers, eConsole, eRender,
+    };
+    use windows::Win32::System::Com::StructuredStorage::{PROPVARIANT, PropVariantClear};
+    use windows::Win32::System::Com::{CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoTaskMemFree, STGM_READ};
+    use windows::Win32::System::Variant::{VT_LPWSTR, VT_UI4};
+
+    /// The device enumerator, after joining COM on this thread. Joining fails
+    /// harmlessly on a thread that already joined in another mode.
+    pub fn enumerator() -> Option<IMMDeviceEnumerator> {
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+            CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).ok()
+        }
+    }
+
+    fn id_of(device: &IMMDevice) -> Option<String> {
+        unsafe {
+            let raw = device.GetId().ok()?;
+            let id = raw.to_string().ok();
+            CoTaskMemFree(Some(raw.0 as *const _));
+            id
+        }
+    }
+
+    /// The default output for ordinary sound, with its id.
+    pub fn default_output(e: &IMMDeviceEnumerator) -> Option<(String, IMMDevice)> {
+        unsafe {
+            let device = e.GetDefaultAudioEndpoint(eRender, eConsole).ok()?;
+            Some((id_of(&device)?, device))
+        }
+    }
+
+    /// Every output that is plugged in and enabled.
+    pub fn devices(e: &IMMDeviceEnumerator) -> Vec<String> {
+        unsafe {
+            let Ok(list) = e.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE) else { return Vec::new() };
+            let count = list.GetCount().unwrap_or(0);
+            (0..count).filter_map(|i| list.Item(i).ok()).filter_map(|d| id_of(&d)).collect()
+        }
+    }
+
+    /// Read one property, handing the value to `read` before it is freed.
+    fn property<T>(device: &IMMDevice, key: &PROPERTYKEY, read: impl FnOnce(&PROPVARIANT) -> Option<T>) -> Option<T> {
+        unsafe {
+            let mut value = device.OpenPropertyStore(STGM_READ).ok()?.GetValue(key).ok()?;
+            let out = read(&value);
+            let _ = PropVariantClear(&mut value);
+            out
+        }
+    }
+
+    pub fn info(device: &IMMDevice) -> OutputInfo {
+        let name = property(device, &PKEY_Device_FriendlyName, |v| unsafe {
+            let inner = &v.Anonymous.Anonymous;
+            if inner.vt == VT_LPWSTR { inner.Anonymous.pwszVal.to_string().ok() } else { None }
+        });
+        let form = property(device, &PKEY_AudioEndpoint_FormFactor, |v| unsafe {
+            let inner = &v.Anonymous.Anonymous;
+            if inner.vt == VT_UI4 { Some(inner.Anonymous.ulVal as i32) } else { None }
+        });
+        let kind = match form {
+            Some(f) if f == Headphones.0 || f == Headset.0 => "headphones",
+            Some(f) if f == Speakers.0 || f == DigitalAudioDisplayDevice.0 => "speakers",
+            _ => "unknown",
+        };
+        let muted = unsafe {
+            device
+                .Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None)
+                .ok()
+                .and_then(|volume| volume.GetMute().ok())
+                .is_some_and(|m| m.as_bool())
+        };
+        OutputInfo { name: name.unwrap_or_else(|| "Output".into()), kind: kind.into(), muted }
+    }
+}
+
+/// What changed between two looks at the default output, if anything.
+/// `still_there` says whether the previous device is still plugged in.
+fn compare<Id: PartialEq>(
+    prev: (&Option<Id>, &Option<OutputInfo>),
+    now: (&Option<Id>, &Option<OutputInfo>),
+    still_there: impl Fn(&Id) -> bool,
+) -> Option<OutputChange> {
+    let ((prev_id, prev_info), (id, info)) = (prev, now);
+    if id == prev_id && info == prev_info {
+        return None;
+    }
+    // Only the mute switch moved: report that on its own.
+    if id == prev_id {
+        if let (Some(p), Some(n)) = (prev_info, info) {
+            if p.name == n.name && p.kind == n.kind && p.muted != n.muted {
+                return Some(OutputChange {
+                    change: if n.muted { "muted".into() } else { "unmuted".into() },
+                    previous: prev_info.clone(),
+                    current: info.clone(),
+                });
+            }
+        }
+    }
+    let removed = match (prev_id, id) {
+        (Some(p), Some(n)) if p != n => !still_there(p),
+        (Some(_), None) => true,
+        // Same device, but headphones unplugged from its jack.
+        (Some(_), Some(_)) => {
+            prev_info.as_ref().is_some_and(|i| i.kind == "headphones") && info.as_ref().is_none_or(|i| i.kind != "headphones")
+        }
+        _ => false,
+    };
+    Some(OutputChange {
+        change: if removed { "removed".into() } else { "switched".into() },
+        previous: prev_info.clone(),
+        current: info.clone(),
+    })
+}
+
 /// Whether any app is recording from a microphone right now.
 pub fn mic_in_use() -> bool {
     #[cfg(target_os = "macos")]
@@ -217,7 +341,11 @@ pub fn current() -> Option<OutputInfo> {
     {
         mac::default_output().map(mac::info)
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    {
+        win::enumerator().and_then(|e| win::default_output(&e)).map(|(_, d)| win::info(&d))
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
     {
         None
     }
@@ -242,8 +370,10 @@ pub fn watch_mic<F: Fn(bool) + Send + 'static>(on_change: F) {
     let _ = on_change;
 }
 
-/// Polls the default output once a second and calls `on_change` when it changes.
-/// Polling two CoreAudio properties a second costs next to nothing.
+/// Polls the default output and calls `on_change` when it changes: once a
+/// second on macOS (two CoreAudio properties cost next to nothing), four
+/// times a second on Windows, where pulling headphones out moves the sound
+/// to the speakers at once, so the pause must come quickly.
 pub fn watch<F: Fn(OutputChange) + Send + 'static>(on_change: F) {
     #[cfg(target_os = "macos")]
     std::thread::spawn(move || {
@@ -254,42 +384,84 @@ pub fn watch<F: Fn(OutputChange) + Send + 'static>(on_change: F) {
             std::thread::sleep(std::time::Duration::from_millis(1000));
             let id = mac::default_output();
             let info = id.map(mac::info);
-            if id == prev_id && info == prev_info {
-                continue;
+            if let Some(change) = compare((&prev_id, &prev_info), (&id, &info), |p| mac::devices().contains(p)) {
+                on_change(change);
             }
-            // Only the mute switch moved: report that on its own.
-            if id == prev_id {
-                if let (Some(p), Some(n)) = (&prev_info, &info) {
-                    if p.name == n.name && p.kind == n.kind && p.muted != n.muted {
-                        on_change(OutputChange {
-                            change: if n.muted { "muted".into() } else { "unmuted".into() },
-                            previous: prev_info.clone(),
-                            current: info.clone(),
-                        });
-                        prev_info = info;
-                        continue;
-                    }
-                }
-            }
-            let removed = match (prev_id, id) {
-                (Some(p), Some(n)) if p != n => !mac::devices().contains(&p),
-                (Some(_), None) => true,
-                // Same device, but headphones unplugged from the jack.
-                (Some(p), Some(n)) if p == n => {
-                    prev_info.as_ref().map(|i| i.kind == "headphones").unwrap_or(false)
-                        && info.as_ref().map(|i| i.kind != "headphones").unwrap_or(true)
-                }
-                _ => false,
-            };
-            on_change(OutputChange {
-                change: if removed { "removed".into() } else { "switched".into() },
-                previous: prev_info.clone(),
-                current: info.clone(),
-            });
             prev_id = id;
             prev_info = info;
         }
     });
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    std::thread::spawn(move || {
+        let Some(e) = win::enumerator() else { return };
+        let look = || match win::default_output(&e) {
+            Some((id, device)) => (Some(id), Some(win::info(&device))),
+            None => (None, None),
+        };
+        let (mut prev_id, mut prev_info) = look();
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(250));
+            let (id, info) = look();
+            if let Some(change) = compare((&prev_id, &prev_info), (&id, &info), |p| win::devices(&e).contains(p)) {
+                on_change(change);
+            }
+            prev_id = id;
+            prev_info = info;
+        }
+    });
+    #[cfg(not(any(target_os = "macos", windows)))]
     let _ = on_change;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn out(name: &str, kind: &str, muted: bool) -> Option<OutputInfo> {
+        Some(OutputInfo { name: name.into(), kind: kind.into(), muted })
+    }
+
+    fn change(prev: (Option<u32>, Option<OutputInfo>), now: (Option<u32>, Option<OutputInfo>), present: &[u32]) -> Option<String> {
+        compare((&prev.0, &prev.1), (&now.0, &now.1), |id| present.contains(id)).map(|c| c.change)
+    }
+
+    #[test]
+    fn nothing_changed() {
+        let a = (Some(1), out("AirPods", "headphones", false));
+        assert_eq!(change(a.clone(), a, &[1]), None);
+    }
+
+    #[test]
+    fn headphones_taken_away_is_removed() {
+        let before = (Some(1), out("AirPods", "headphones", false));
+        let after = (Some(2), out("MacBook Speakers", "speakers", false));
+        assert_eq!(change(before, after, &[2]).as_deref(), Some("removed"));
+    }
+
+    #[test]
+    fn choosing_another_output_is_a_switch() {
+        let before = (Some(1), out("AirPods", "headphones", false));
+        let after = (Some(2), out("MacBook Speakers", "speakers", false));
+        assert_eq!(change(before, after, &[1, 2]).as_deref(), Some("switched"));
+    }
+
+    #[test]
+    fn unplugging_from_the_jack_is_removed() {
+        let before = (Some(1), out("Built-in Output", "headphones", false));
+        let after = (Some(1), out("Built-in Output", "speakers", false));
+        assert_eq!(change(before, after, &[1]).as_deref(), Some("removed"));
+    }
+
+    #[test]
+    fn no_output_left_is_removed() {
+        assert_eq!(change((Some(1), out("USB DAC", "unknown", false)), (None, None), &[]).as_deref(), Some("removed"));
+    }
+
+    #[test]
+    fn the_mute_switch_alone() {
+        let on = (Some(1), out("AirPods", "headphones", false));
+        let off = (Some(1), out("AirPods", "headphones", true));
+        assert_eq!(change(on.clone(), off.clone(), &[1]).as_deref(), Some("muted"));
+        assert_eq!(change(off, on, &[1]).as_deref(), Some("unmuted"));
+    }
 }

@@ -14,6 +14,7 @@ import {
 } from './platform/updates';
 import { chordRatio } from './visuals/chords';
 import { GLOBAL_SHORTCUTS, loadSettings, patchSettings, type AppSettings } from './settings/model';
+import { keys } from './platform/os';
 
 const session = new Session();
 const app = document.getElementById('app')!;
@@ -231,7 +232,7 @@ async function contextMenu(anchor: HTMLElement, at?: { x: number; y: number }): 
     [
       check('ctx:top', 'Always on top', settings.alwaysOnTop),
       submenu('Snap to corner', [item('ctx:snap-tl', 'Top left'), item('ctx:snap-tr', 'Top right'), item('ctx:snap-bl', 'Bottom left'), item('ctx:snap-br', 'Bottom right')]),
-      check('ctx:mini', 'Mini player    ⌘M', mini),
+      check('ctx:mini', `Mini player    ${keys('⌘M')}`, mini),
       sep,
       item('ctx:learn', 'Learn'),
       item('ctx:settings', 'Settings…'),

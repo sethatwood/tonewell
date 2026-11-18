@@ -133,10 +133,12 @@ npm run screenshots     # regenerates the screenshots above
 [docs/listening.md](docs/listening.md) says what to listen for when checking
 the sound by ear.
 
-macOS (Apple Silicon) is the first target. The code is cross-platform Tauri,
-with the macOS-only parts (output and microphone watching, media keys and
-headphone buttons, the animated resize) behind platform checks, so Windows
-and Linux builds should work but haven't been tried.
+macOS is the main target, on Apple silicon and Intel. Windows has its own
+output watcher, so pulling headphones out pauses the sound there too; it is
+built by CI but has barely been tried. Linux builds and should play, without
+output watching, untested. The other macOS-only parts (microphone watching,
+media keys and headphone buttons, the animated resize) sit behind platform
+checks.
 
 ## How it's put together
 

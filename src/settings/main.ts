@@ -7,6 +7,7 @@ import { h, scale, switchControl } from '../ui/controls';
 import { emit, isTauri, listen, openExternal } from '../platform/bridge';
 import { reloadDoc } from '../platform/store';
 import { checkForUpdate, onUpdateStatus, updateStatus, type UpdateStatus } from '../platform/updates';
+import { computer, isMac, keys } from '../platform/os';
 
 document.title = 'Tonewell Settings';
 document.documentElement.dataset.mode = 'meditate';
@@ -61,7 +62,7 @@ async function boot(): Promise<void> {
   void autostart().then(async (a) => login.set(a ? await a.isEnabled() : false));
 
   const shortcuts = switchControl('Global shortcuts', s.shortcutsEnabled, (on) => void save({ shortcutsEnabled: on }), true);
-  const list = h('dl', { class: 'shortcut-list' }, ...GLOBAL_SHORTCUTS.flatMap((g) => [h('dt', {}, h('span', { class: 'kbd' }, g.keys)), h('dd', {}, g.label)]));
+  const list = h('dl', { class: 'shortcut-list' }, ...GLOBAL_SHORTCUTS.flatMap((g) => [h('dt', {}, h('span', { class: 'kbd' }, keys(g.keys))), h('dd', {}, g.label)]));
 
   const calm = switchControl('Calm visuals', s.calmVisuals, (on) => void save({ calmVisuals: on }), true);
   const cap = scale({
@@ -84,7 +85,7 @@ async function boot(): Promise<void> {
     const fmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
     logBox.replaceChildren(
       h('p', { class: 'set-help' }, log.length === 0
-        ? 'Nothing here yet. Finished sessions of a minute or more appear here, on this Mac only.'
+        ? `Nothing here yet. Finished sessions of a minute or more appear here, on this ${computer} only.`
         : `In the last seven days: ${week.length} ${week.length === 1 ? 'session' : 'sessions'}, ${minutes} minutes.`),
       ...(log.length
         ? [h('ol', { class: 'log-list' }, ...log.slice(-12).reverse().map((e) => h('li', {}, h('span', {}, fmt.format(new Date(e.at))), h('span', {}, e.preset), h('span', {}, `${e.minutes} min`))))]
@@ -122,15 +123,16 @@ async function boot(): Promise<void> {
       h('h1', { class: 'voice' }, 'Settings'),
       h('section', {}, h('h2', {}, 'General'),
         row('Keep the mini player on top', 'Floats above other windows. Right-click the player for this and for snapping it to a corner.', top.el),
-        row('Show minutes left in the menu bar', 'Off by default: a number next to the icon, updated once a minute.', time.el),
+        isMac ? row('Show minutes left in the menu bar', 'Off by default: a number next to the icon, updated once a minute.', time.el) : null,
         row('Open at login', null, login.el),
-        row('Show in the Dock', 'Turn this off to keep Tonewell only in the menu bar.', dock.el),
-        row('Soften during calls', 'When any app is using a microphone, the sound gets noticeably quieter, then comes back afterwards. Tonewell only checks whether a microphone is in use; it never listens.', soften.el),
+        // The Dock and microphone watching exist only on macOS.
+        isMac ? row('Show in the Dock', 'Turn this off to keep Tonewell only in the menu bar.', dock.el) : null,
+        isMac ? row('Soften during calls', 'When any app is using a microphone, the sound gets noticeably quieter, then comes back afterwards. Tonewell only checks whether a microphone is in use; it never listens.', soften.el) : null,
       ),
       h('section', {}, h('h2', {}, 'Shortcuts'),
         row('Global shortcuts', 'Control Tonewell from any app. They stay off until you turn them on, so they never clash with your other apps.', shortcuts.el),
         list,
-        h('p', { class: 'set-help' }, 'In the mini player: Space starts, Esc winds down and then ends, ⌘↑ and ⌘↓ change the volume, + and − wind the timer, [ and ] change the preset.'),
+        h('p', { class: 'set-help' }, `In the mini player: Space starts, Esc winds down and then ends, ${keys('⌘↑')} and ${keys('⌘↓')} change the volume, + and − wind the timer, [ and ] change the preset.`),
       ),
       h('section', {}, h('h2', {}, 'Visuals'),
         row('Calm visuals', 'Dimmer, slower and softer color.', calm.el),
@@ -149,7 +151,7 @@ async function boot(): Promise<void> {
         h('div', {}, checkNow),
       ),
       h('section', {}, h('h2', {}, 'About'),
-        h('p', {}, 'Tonewell makes every sound on your Mac as it plays: nothing is recorded, nothing is streamed, and nothing about how you use it leaves this computer.'),
+        h('p', {}, `Tonewell makes every sound on your ${computer} as it plays: nothing is recorded, nothing is streamed, and nothing about how you use it leaves this computer.`),
         h('p', {}, 'Open source under the MIT License: ', repo, '.'),
         h('p', { class: 'set-help' }, 'Type: Figtree, by Erik Kennedy, SIL Open Font License.'),
       ),

@@ -155,9 +155,18 @@ one program per scene and cross-fade by blending.
 
 **Decision.** The Rust side owns the menu-bar menu (built from a
 description the page sends), keep-awake (`keepawake` crate), and an
-output-device watcher that polls CoreAudio once a second. macOS-only code
-sits behind `cfg(target_os = "macos")` with harmless fallbacks, so
-Windows and Linux builds should compile and play, untested.
+output-device watcher: CoreAudio once a second on macOS, and the Windows
+Core Audio API four times a second on Windows, where pulling headphones
+out moves the sound to the speakers at once. Both report the same changes
+through one comparison. Other macOS-only code (microphone watching, media
+keys, the animated resize) sits behind `cfg(target_os = "macos")` with
+harmless fallbacks; Linux has no output watcher. Off macOS the tray icon is
+the glyph on a deep disc, which shows on light and dark taskbars, and the
+page says "computer" for "Mac", writes shortcuts as Ctrl+M, and hides the
+settings that only macOS can honour (Dock, minutes in the menu bar,
+softening for calls). Windows builds are compile-checked on a Mac with
+cargo-xwin and built by CI; neither Windows nor Linux has been tried on
+hardware yet.
 
 The page decides how the session reacts: if the previous output
 disappeared, it mutes and waits; if the output switched, it dips and fades

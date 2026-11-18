@@ -75,11 +75,19 @@ fn build_menu(app: &AppHandle, nodes: &[MenuNode]) -> tauri::Result<Menu<Wry>> {
     Ok(menu)
 }
 
+/// The menu-bar icon. macOS draws a template image in the menu bar's own
+/// colour; Windows and Linux taskbars may be light or dark, so there the
+/// glyph sits on a deep disc that shows on either.
+const TRAY_TEMPLATE: bool = cfg!(target_os = "macos");
+
 fn tray_image(state: &str) -> tauri::Result<Image<'static>> {
-    let bytes: &[u8] = match state {
-        "playing" => include_bytes!("../icons/tray/playing.png"),
-        "resting" => include_bytes!("../icons/tray/resting.png"),
-        _ => include_bytes!("../icons/tray/ready.png"),
+    let bytes: &[u8] = match (state, TRAY_TEMPLATE) {
+        ("playing", true) => include_bytes!("../icons/tray/playing.png"),
+        ("resting", true) => include_bytes!("../icons/tray/resting.png"),
+        (_, true) => include_bytes!("../icons/tray/ready.png"),
+        ("playing", false) => include_bytes!("../icons/tray/playing-color.png"),
+        ("resting", false) => include_bytes!("../icons/tray/resting-color.png"),
+        (_, false) => include_bytes!("../icons/tray/ready-color.png"),
     };
     Image::from_bytes(bytes)
 }
@@ -93,7 +101,7 @@ fn tray_update(app: AppHandle, menu: Vec<MenuNode>, icon: String, title: Option<
     let tray = tray(&app).ok_or("no tray")?;
     let built = build_menu(&app, &menu).map_err(|e| e.to_string())?;
     tray.set_menu(Some(built)).map_err(|e| e.to_string())?;
-    tray.set_icon_with_as_template(Some(tray_image(&icon).map_err(|e| e.to_string())?), true)
+    tray.set_icon_with_as_template(Some(tray_image(&icon).map_err(|e| e.to_string())?), TRAY_TEMPLATE)
         .map_err(|e| e.to_string())?;
     tray.set_title(title.as_deref()).map_err(|e| e.to_string())?;
     tray.set_tooltip(Some(tooltip)).map_err(|e| e.to_string())?;
@@ -416,7 +424,7 @@ pub fn run() {
             )?;
             TrayIconBuilder::with_id(TRAY_ID)
                 .icon(tray_image("ready")?)
-                .icon_as_template(true)
+                .icon_as_template(TRAY_TEMPLATE)
                 .show_menu_on_left_click(true)
                 .tooltip("Tonewell")
                 .menu(&start)
