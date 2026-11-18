@@ -11,7 +11,8 @@
 #      release for the tag.
 #   3. npm run release
 #      Builds, signs and notarizes the Mac app, signs every update, publishes
-#      the GitHub release and writes site/updates/latest.json.
+#      the GitHub release, writes site/updates/latest.json and points the
+#      site's download buttons at the new files.
 #   4. Commit site/ and push. Forge deploys it, and installed copies find the
 #      update the next time they look.
 #
@@ -155,8 +156,10 @@ JS
 
 mkdir -p "$(dirname "$MANIFEST")"
 cp "$OUT/latest.json" "$MANIFEST"
+node scripts/site-downloads.mjs "$VERSION" mac="$DOWNLOAD/$DMG" windows="$DOWNLOAD/$EXE" appimage="$DOWNLOAD/$APPIMAGE" deb="$DOWNLOAD/$DEB"
 
 echo
 echo "Release $VERSION is published on GitHub:"
 echo "  https://github.com/$REPO/releases/tag/$TAG"
-echo "Commit $MANIFEST and push to main: installed copies then update within a day."
+echo "Commit site/ and push to main: the download buttons go live, and installed"
+echo "copies update within a day."

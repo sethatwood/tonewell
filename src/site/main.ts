@@ -1,6 +1,7 @@
-// tonewell.space's only script: "Hear a taste" and the live visuals. Each
-// loads its engine only when asked for, and nothing plays or lights up on
-// its own.
+// tonewell.space's only script: "Hear a taste", the live visuals, and the
+// visitor's own system first in Download. The taste and the visuals load
+// their engines only when asked for, and nothing plays or lights up on its
+// own.
 
 import type { Taste } from './taste';
 
@@ -96,3 +97,16 @@ if (screen) {
     b.addEventListener('click', () => start(Number(b.dataset.scene)));
   }
 }
+
+// Download: the button for this visitor's system comes first and stands out.
+// Without the script both stay, Mac first.
+const options = document.querySelector<HTMLElement>('.download__options');
+const system = /Windows/.test(navigator.userAgent) ? 'windows' : /Macintosh|Mac OS X/.test(navigator.userAgent) ? 'mac' : null;
+const mine = system ? options?.querySelector<HTMLElement>(`[data-os="${system}"]`) : null;
+if (options && mine) {
+  options.prepend(mine);
+  for (const option of options.querySelectorAll<HTMLElement>('[data-os]')) {
+    option.querySelector('.cta')?.classList.toggle('cta--ghost', option !== mine);
+  }
+}
+
