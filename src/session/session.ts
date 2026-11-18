@@ -305,8 +305,12 @@ export class Session extends EventTarget {
     this.afterParamChange();
   }
 
-  /** Change several parameters as one step: one glide, one beat plan, one save. */
-  setParams(patch: Partial<SoundParams>): void {
+  /**
+   * Change several parameters as one step: one glide, one beat plan, one
+   * save. `tau` is the glide's time constant in seconds; by default the
+   * macros' gentle one if only macros change, otherwise a quick one.
+   */
+  setParams(patch: Partial<SoundParams>, tau?: number): void {
     const next = { ...this.current.params };
     let changed = false;
     let beat = false;
@@ -319,7 +323,8 @@ export class Session extends EventTarget {
     }
     if (!changed) return;
     this.current.params = next;
-    this.engine?.setParams(this.engineParams(), 0.15);
+    const macros = Object.keys(patch).every((k) => PARAMS[k as ParamId]?.group === 'macro');
+    this.engine?.setParams(this.engineParams(), tau ?? (macros ? 0.7 : 0.15));
     if (beat) this.applyBeatPlan(2);
     this.afterParamChange();
   }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Session, type Snapshot } from '../../src/session/session';
-import { trayMenu } from '../../src/ui/tray';
-import { beatMenu, lengthMenu, presetMenu } from '../../src/ui/player';
+import { lengthMenu, soundMenu, trayMenu, trayStatus } from '../../src/ui/tray';
+import { beatMenuNodes } from '../../src/ui/beats';
 import type { MenuNode } from '../../src/ui/menu';
 import { BEAT_CHOICES, beatShort, choiceParams } from '../../src/ui/beats';
 
@@ -14,7 +14,8 @@ function ids(nodes: MenuNode[]): string[] {
   return out;
 }
 
-const KNOWN = /^(go|wind|resume|end|status|show|visuals|learn|settings|quit|check-updates|update-restart|keep-playing|preset-save-as|preset-save|preset-rename|preset-duplicate|preset-delete|preset-revert|mode:(meditate|focus)|preset:.+|length:(\d+|open)|volume:(up|down|\d+)|beat:(off|more|learn|custom|settle|header-(meditate|focus)|[\d.]+))$/;
+const KNOWN = /^(go|wind|resume|end|status|show|visuals|learn|settings|quit|check-updates|update-restart|keep-playing|sound-sheet|header:(meditate|focus|yours)|preset-save-as|preset-save|preset-rename|preset-duplicate|preset-delete|preset-revert|mode:(meditate|focus)|preset:.+|length:(\d+|open)|volume:(up|down|\d+)|beat:(off|more|learn|custom|settle|header-(meditate|focus)|[\d.]+))$/;
+const beatMenu = (s: Snapshot) => beatMenuNodes(s.params, s.mode);
 
 describe('menus', () => {
   const session = new Session();
@@ -33,7 +34,7 @@ describe('menus', () => {
 
   it('only uses actions the app knows how to handle', () => {
     const s = snap({ phase: 'playing' });
-    for (const id of [...ids(trayMenu(session, s, true)), ...ids(trayMenu(session, s, true, '9.9.9')), ...ids(lengthMenu(s)), ...ids(beatMenu(s)), ...ids(presetMenu(session, s))]) {
+    for (const id of [...ids(trayMenu(session, s, true)), ...ids(trayMenu(session, s, true, '9.9.9')), ...ids(lengthMenu(s)), ...ids(beatMenu(s)), ...ids(soundMenu(session, { ...s, edited: true }))]) {
       expect(id).toMatch(KNOWN);
     }
   });
@@ -49,9 +50,27 @@ describe('menus', () => {
     expect(on).toContain(`mode:${s.mode}`);
   });
 
+  it('says where a session stands, in the player’s words', () => {
+    const s = session.snapshot();
+    const at = new Date(2026, 10, 18, 14, 17);
+    expect(trayStatus({ ...s, phase: 'playing', endsAt: at, remaining: 600 })).toMatch(new RegExp(`^${s.preset.name} · ends `));
+    expect(trayStatus({ ...s, phase: 'playing', endsAt: null, remaining: null })).toBe(`${s.preset.name} · open-ended`);
+    expect(trayStatus({ ...s, phase: 'resting', inBreak: true, restLeft: 480 })).toBe(`${s.preset.name} · break, 8 min`);
+    expect(trayStatus({ ...s, phase: 'resting', paused: true })).toBe(`${s.preset.name} · paused`);
+    expect(trayStatus({ ...s, phase: 'playing', remaining: 1860, endsAt: at, block: 2, prefs: { ...s.prefs, minutes: 50, breakMinutes: 10 } })).toBe(`${s.preset.name} · block 2, 31 min to break`);
+  });
+
+  it('offers only End once the timer is done, and Start now on a break', () => {
+    const done = ids(trayMenu(session, snap({ phase: 'resting', timerDone: true }), false));
+    expect(done).toContain('end');
+    expect(done).not.toContain('resume');
+    const brk = trayMenu(session, snap({ phase: 'resting', inBreak: true }), false);
+    expect(brk.some((n) => n.kind === 'item' && n.id === 'resume' && n.label === 'Start now')).toBe(true);
+  });
+
   it('lists only the current mode’s presets', () => {
     const s = session.snapshot();
-    const presets = ids(presetMenu(session, s)).filter((id) => id.startsWith('preset:'));
+    const presets = ids(soundMenu(session, s)).filter((id) => id.startsWith('preset:'));
     for (const id of presets) expect(session.findPreset(id.slice(7))?.mode).toBe(s.mode);
   });
 });

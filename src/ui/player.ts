@@ -5,21 +5,26 @@
 // reaching it with the keyboard, swaps in one sentence about that control at
 // once. Rest messages and notices take the place of the name, the hint line
 // and the chips. Only text, opacity and colour change between states: the
-// layout holds still, and nothing on screen counts seconds.
+// layout holds still, and nothing on screen counts seconds. Everything else
+// is a sheet away: the eyebrow and name open Sound, the chips open Session
+// and Beat, the tools open Shape and the Field guide.
 
 import type { Notice, Session, Snapshot } from '../session/session';
 import { h } from './controls';
 import { uiIcon, type UiIcon } from './icons';
-import { check, item, popup, sep, submenu, type MenuNode } from './menu';
-import { BEAT_CHOICES, beatHint, beatLong, beatMenuNodes, beatName, choiceParams } from './beats';
+import { BEAT_CHOICES, beatHint, beatLong, beatName, choiceParams } from './beats';
+import { HintLine, type Hint } from './hint';
+import { sheetIs, type NameRequest, type SheetName } from './sheets/host';
 // Windows writes shortcuts longer (Ctrl+Shift+V), so a few hints say less there to fit the line.
 import { isMac, keys } from '../platform/os';
 
+export type { Hint } from './hint';
+
 export interface PlayerActions {
-  /** Show or hide the full controls under the player. */
-  toggleExpanded(): void;
-  /** Open the full controls (never closes them). */
-  expand(): void;
+  /** Open a sheet under the player, or close it if it's the one open. `opener` gets focus back when it closes. */
+  toggleSheet(name: SheetName, opener: HTMLElement | null): void;
+  /** Open a sheet (from the menu bar, or another sheet). */
+  openSheet(name: SheetName, arg?: unknown): void;
   openVisuals(): void;
   openLearn(card?: string): void;
   openSettings(): void;
@@ -40,48 +45,8 @@ export function lengthLabel(m: number | null): string {
   return m === null ? 'Open' : `${m} min`;
 }
 
-export function lengthMenu(s: Snapshot): MenuNode[] {
-  return [
-    ...LENGTHS.map((m) => check(`length:${m ?? 'open'}`, m === null ? 'Open-ended' : `${m} minutes`, s.prefs.minutes === m)),
-    sep,
-    check('keep-playing', 'Keep playing after', s.prefs.keepPlaying),
-  ];
-}
-
-export function beatMenu(s: Snapshot): MenuNode[] {
-  return beatMenuNodes(s.params, s.mode);
-}
-
-export function presetMenu(session: Session, s: Snapshot): MenuNode[] {
-  const list = session.presetsFor(s.mode);
-  const builtin = list.filter((p) => p.builtin);
-  const mine = list.filter((p) => !p.builtin);
-  const nodes: MenuNode[] = builtin.map((p) => check(`preset:${p.id}`, p.name, p.id === s.preset.id));
-  if (mine.length) {
-    nodes.push(sep, ...mine.map((p) => check(`preset:${p.id}`, p.name, p.id === s.preset.id)));
-  }
-  nodes.push(sep, item('preset-save-as', 'Save as new preset…'));
-  if (!s.preset.builtin) {
-    nodes.push(
-      submenu(`“${s.preset.name}”`, [
-        item('preset-save', 'Save changes', s.edited),
-        item('preset-rename', 'Rename…'),
-        item('preset-duplicate', 'Duplicate'),
-        item('preset-delete', 'Delete'),
-      ]),
-    );
-  }
-  if (s.edited) nodes.push(item('preset-revert', 'Revert to saved'));
-  return nodes;
-}
-
-/** Mode and sound in one menu: what the eyebrow and the name open. */
-export function soundMenu(session: Session, s: Snapshot): MenuNode[] {
-  return [check('mode:meditate', 'Meditate', s.mode === 'meditate'), check('mode:focus', 'Focus', s.mode === 'focus'), sep, ...presetMenu(session, s)];
-}
-
-/** Handle ids shared by the pop-up menus and the menu-bar menu. Returns false if unknown. */
-export async function handleMenuId(id: string, session: Session, actions: PlayerActions, ask: (q: string, def: string) => Promise<string | null>): Promise<boolean> {
+/** Handle ids shared by the menu bar and the right-click menu. Returns false if unknown. */
+export async function handleMenuId(id: string, session: Session, actions: PlayerActions): Promise<boolean> {
   const s = session.snapshot();
   if (id.startsWith('length:')) {
     const v = id.slice(7);
@@ -90,10 +55,8 @@ export async function handleMenuId(id: string, session: Session, actions: Player
     session.setPrefs({ keepPlaying: !s.prefs.keepPlaying });
   } else if (id.startsWith('beat:')) {
     const v = id.slice(5);
-    if (v === 'more') {
-      actions.expand();
-      document.dispatchEvent(new CustomEvent('tonewell:panel-tab', { detail: 'beat' }));
-    } else if (v === 'learn') actions.openLearn('brainwave-bands');
+    if (v === 'more') actions.openSheet('custom');
+    else if (v === 'learn') actions.openLearn('evidence');
     else if (v === 'off') session.setParam('beatOn', 0);
     else {
       const choice = BEAT_CHOICES.find((c) => c.id === v);
@@ -101,15 +64,12 @@ export async function handleMenuId(id: string, session: Session, actions: Player
     }
   } else if (id.startsWith('preset:')) {
     session.setPreset(id.slice(7));
-  } else if (id === 'preset-save-as') {
-    const name = await ask('Name your preset', `${s.preset.name} (mine)`);
-    if (name) session.saveAsPreset(name);
-  } else if (id === 'preset-save') session.savePreset();
-  else if (id === 'preset-rename') {
-    const name = await ask('Rename preset', s.preset.name);
-    if (name) session.renamePreset(s.preset.id, name);
-  } else if (id === 'preset-duplicate') session.duplicatePreset(s.preset.id);
-  else if (id === 'preset-delete') session.deletePreset(s.preset.id);
+  } else if (id === 'sound-sheet') actions.openSheet('sound');
+  else if (id === 'preset-save-as') actions.openSheet('name', { kind: 'keep' } satisfies NameRequest);
+  else if (id === 'preset-save') session.savePreset();
+  else if (id === 'preset-rename') actions.openSheet('name', { kind: 'rename', id: s.preset.id } satisfies NameRequest);
+  else if (id === 'preset-duplicate') session.duplicatePreset(s.preset.id);
+  else if (id === 'preset-delete') actions.openSheet('name', { kind: 'delete', id: s.preset.id } satisfies NameRequest);
   else if (id === 'preset-revert') session.revert();
   else if (id.startsWith('volume:')) {
     const v = id.slice(7);
@@ -122,12 +82,6 @@ export async function handleMenuId(id: string, session: Session, actions: Player
 }
 
 // ---------- the words ----------
-
-/** One hint: bold words, plain words and key caps, in order. */
-type Part = { b: string } | { t: string } | { k: string };
-export type Hint = Part[];
-
-const plain = (hint: Hint): string => hint.map((p) => ('b' in p ? p.b : 't' in p ? p.t : p.k)).join(' ');
 
 /** The sound's one-line description: its own line, or the start of its blurb. */
 export function shortDescription(s: Snapshot): string {
@@ -277,12 +231,6 @@ function lightState(s: Snapshot): LightState {
 
 // ---------- the player ----------
 
-interface Hinted {
-  el: HTMLElement;
-  hint: () => Hint;
-  desc: HTMLSpanElement;
-}
-
 type ChipSpec = { label: string; hint: () => Hint; build: (b: HTMLButtonElement) => void; onClick: (b: HTMLButtonElement) => void; className: string; key?: string };
 
 const VOLUME_IDLE_MS = 4000;
@@ -312,18 +260,16 @@ export class Player {
   private readonly volumeInput: HTMLInputElement;
   private readonly volumeValue: HTMLSpanElement;
   private readonly volumeIcon: HTMLSpanElement;
-  /** Hidden copies of each control's hint, for aria-describedby. */
-  private readonly descs: HTMLDivElement = h('div', { hidden: true });
-  private readonly hinted = new Map<number, Hinted>();
-  private nextHint = 0;
+  private readonly hints: HintLine;
+  private readonly main: HTMLDivElement;
+  private readonly helpBtn: HTMLButtonElement;
+  /** The Field guide's numbers beside the controls. */
+  private readonly badgeLayer: HTMLDivElement;
+  private sheetName: SheetName | null = null;
 
   private snap: Snapshot | null = null;
   private light: LightState | null = null;
-  private hovered: HTMLElement | null = null;
-  private focused: HTMLElement | null = null;
-  private hintKey = '';
   private glowKey = '';
-  private hintTimer: ReturnType<typeof setTimeout> | null = null;
   private minuteTimer: ReturnType<typeof setTimeout> | null = null;
   private chipsKey = '';
   private shownNotice: Notice | null = null;
@@ -335,7 +281,12 @@ export class Player {
   private dragFrom: { x: number; y: number; id: number } | null = null;
   private dragged = false;
 
-  constructor(private readonly session: Session, private readonly actions: PlayerActions, ask: (q: string, def: string) => Promise<string | null>) {
+  constructor(private readonly session: Session, private readonly actions: PlayerActions) {
+    // The hint line comes first: every control registers its hint with it.
+    this.main = h('div', { class: 'player__main', 'data-tauri-drag-region': true });
+    this.hintEl = h('div', { class: 'hint', 'aria-hidden': 'true', 'data-tauri-drag-region': 'deep' });
+    this.hints = new HintLine(this.main, this.hintEl, () => [{ t: this.snap ? description(this.snap, this.firstRun) : '' }]);
+
     // The light
     this.core = h('span', { class: 'ripple__core' });
     this.ripple = h(
@@ -352,29 +303,27 @@ export class Player {
     // Eyebrow: the sound menu at rest, a status word otherwise
     this.eyebrowWord = h('span');
     this.editedDot = h('span', { class: 'eyebrow__dot', 'aria-hidden': 'true' });
-    this.eyebrowBtn = h('button', { class: 'eyebrow', type: 'button', 'aria-haspopup': 'menu' }, this.eyebrowWord, this.editedDot, uiIcon('chevron-down'));
+    this.eyebrowBtn = h('button', { class: 'eyebrow', type: 'button', 'aria-haspopup': 'dialog', 'aria-expanded': 'false' }, this.eyebrowWord, this.editedDot, uiIcon('chevron-down'));
     this.eyebrowText = h('span', { class: 'eyebrow' });
-    const chooseSound = async (anchor: HTMLElement) => {
-      const id = await popup(soundMenu(session, session.snapshot()), anchor);
-      if (id) await handleMenuId(id, session, actions, ask);
-    };
-    this.eyebrowBtn.addEventListener('click', () => void chooseSound(this.eyebrowBtn));
-    this.hint(this.eyebrowBtn, () => [{ b: 'Choose a sound.' }, { k: '[' }, { k: ']' }, { t: 'step through.' }]);
+    this.eyebrowBtn.addEventListener('click', () => actions.toggleSheet('sound', this.eyebrowBtn));
+    this.hints.add(this.eyebrowBtn, () => [{ b: 'Choose a sound.' }, { k: '[' }, { k: ']' }, { t: 'step through.' }]);
 
     // Tools: shown when the pointer is over the window or focus is inside it
-    this.shapeBtn = this.tool('shape', 'Shape the sound', () => actions.toggleExpanded(), () => [{ b: 'Shape:' }, { t: 'warmer, stiller, more rain.' }]);
+    this.shapeBtn = this.tool('shape', 'Shape the sound', () => actions.toggleSheet('shape', this.shapeBtn), () => [{ b: 'Shape:' }, { t: 'warmer, stiller, more rain.' }]);
     this.shapeBtn.setAttribute('aria-expanded', 'false');
     const visualsBtn = this.tool('visuals', 'Open visuals', () => actions.openVisuals(), () => [{ b: 'Visuals,' }, { t: isMac ? 'in their own window.' : 'in a window.' }, { k: keys('⇧⌘V') }]);
+    this.helpBtn = this.tool('help', 'Field guide', () => actions.toggleSheet('guide', this.helpBtn), () => [{ b: 'Field guide.' }, { t: 'What everything does.' }, { k: '?' }]);
+    this.helpBtn.setAttribute('aria-expanded', 'false');
+    this.helpBtn.setAttribute('aria-keyshortcuts', '?');
     const miniBtn = this.tool('mini', 'Shrink to the light', () => actions.toggleMini(), () => [{ b: isMac ? 'Mini player:' : 'Mini:' }, { t: 'just the light.' }, { k: keys('⌘M') }]);
     miniBtn.setAttribute('aria-keyshortcuts', 'Meta+M');
-    const tools = h('div', { class: 'player__tools' }, this.shapeBtn, visualsBtn, miniBtn);
+    const tools = h('div', { class: 'player__tools' }, this.shapeBtn, visualsBtn, this.helpBtn, miniBtn);
     const top = h('div', { class: 'player__top', 'data-tauri-drag-region': true }, this.eyebrowBtn, this.eyebrowText, tools);
 
     // What is playing, and the hint line
-    this.nameBtn = h('button', { class: 'player__name', type: 'button', 'aria-haspopup': 'menu' });
-    this.nameBtn.addEventListener('click', () => void chooseSound(this.nameBtn));
-    this.hint(this.nameBtn, () => [{ b: 'Choose a sound.' }, { k: '[' }, { k: ']' }, { t: 'step through.' }]);
-    this.hintEl = h('div', { class: 'hint', 'aria-hidden': 'true', 'data-tauri-drag-region': 'deep' });
+    this.nameBtn = h('button', { class: 'player__name', type: 'button', 'aria-haspopup': 'dialog', 'aria-expanded': 'false' });
+    this.nameBtn.addEventListener('click', () => actions.toggleSheet('sound', this.nameBtn));
+    this.hints.add(this.nameBtn, () => [{ b: 'Choose a sound.' }, { k: '[' }, { k: ']' }, { t: 'step through.' }]);
     this.restEl = h('div', { class: 'rest-message', role: 'status', 'data-tauri-drag-region': 'deep' });
     this.actionsEl = h('div', { class: 'player__actions', 'data-tauri-drag-region': true });
     this.noticeEl = h('div', { class: 'notice', role: 'status', 'aria-live': 'polite', 'data-tauri-drag-region': 'deep' });
@@ -387,23 +336,13 @@ export class Player {
     this.bindVolume();
 
     const body = h('div', { class: 'player__body', 'data-tauri-drag-region': true }, top, this.nameBtn, this.hintEl, this.restEl, this.noticeEl, this.actionsEl, this.volumeRow);
-    const main = h('div', { class: 'player__main', 'data-tauri-drag-region': true }, this.ripple, body);
+    this.badgeLayer = h('div', { class: 'badges', 'aria-hidden': 'true', hidden: true });
+    const main = this.main;
+    main.append(this.ripple, body, this.badgeLayer);
     this.sheet = h('div', { class: 'player__sheet' });
     const ground = h('div', { class: 'player__ground', 'aria-hidden': 'true' });
-    this.el = h('section', { class: 'player', 'aria-label': 'Tonewell player' }, ground, main, this.sheet, this.descs);
+    this.el = h('section', { class: 'player', 'aria-label': 'Tonewell player' }, ground, main, this.sheet, this.hints.descs);
 
-    // Hints follow the pointer, and keyboard focus.
-    this.el.addEventListener('pointerover', (e) => this.setHovered(this.hintedFrom(e.target)));
-    this.el.addEventListener('pointerleave', () => this.setHovered(null));
-    main.addEventListener('focusin', (e) => {
-      const el = this.hintedFrom(e.target);
-      this.focused = el && el.matches(':focus-visible') ? el : null;
-      this.paintHint();
-    });
-    main.addEventListener('focusout', () => {
-      this.focused = null;
-      this.paintHint();
-    });
     main.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       actions.contextMenu(main, { x: e.clientX, y: e.clientY });
@@ -415,34 +354,8 @@ export class Player {
   private tool(icon: UiIcon, label: string, onClick: () => void, hint: () => Hint): HTMLButtonElement {
     const b = h('button', { class: 'icon-btn', type: 'button', 'aria-label': label }, uiIcon(icon));
     b.addEventListener('click', onClick);
-    this.hint(b, hint);
+    this.hints.add(b, hint);
     return b;
-  }
-
-  /** Give a control a hint: shown in the hint line, and read with the control by VoiceOver. */
-  private hint(el: HTMLElement, hint: () => Hint): void {
-    const n = ++this.nextHint;
-    const desc = h('span', { id: `hint-${n}` });
-    el.setAttribute('aria-describedby', desc.id);
-    el.dataset.hinted = String(n);
-    this.hinted.set(n, { el, hint, desc });
-    this.descs.append(desc);
-  }
-
-  private hintedFrom(target: EventTarget | null): HTMLElement | null {
-    const el = (target as HTMLElement | null)?.closest?.('[data-hinted]') as HTMLElement | null;
-    return el && this.el.contains(el) ? el : null;
-  }
-
-  private setHovered(el: HTMLElement | null): void {
-    if (el === this.hovered) return;
-    this.hovered = el;
-    this.paintHint();
-  }
-
-  private hintFor(el: HTMLElement): Hint | null {
-    const entry = this.hinted.get(Number(el.dataset.hinted));
-    return entry && el.isConnected && !el.closest('[hidden]') ? entry.hint() : null;
   }
 
   // ---------- the light ----------
@@ -477,7 +390,7 @@ export class Player {
       if (l.press === 'end') this.session.end();
       else void this.session.go();
     });
-    this.hint(r, () => (this.mini ? [{ b: 'Open the player.' }, { k: keys('⌘M') }] : (this.light?.hint ?? [])));
+    this.hints.add(r, () => (this.mini ? [{ b: 'Open the player.' }, { k: keys('⌘M') }] : (this.light?.hint ?? [])));
   }
 
   private paintLight(s: Snapshot): void {
@@ -577,8 +490,8 @@ export class Player {
     }
     if (this.volumeOpen || !this.volumeRow.hidden) this.paintVolume(s);
 
-    for (const entry of this.hinted.values()) entry.desc.textContent = plain(entry.hint());
-    this.paintHint();
+    this.hints.refresh();
+    if (!this.badgeLayer.hidden) this.placeBadges();
     this.scheduleMinute(s);
 
     // If what had keyboard focus just went away (chips replaced by a notice, the volume row
@@ -618,7 +531,7 @@ export class Player {
       this.chipsKey = key;
       const hadFocus = this.actionsEl.contains(document.activeElement);
       const index = hadFocus ? [...this.actionsEl.children].indexOf(document.activeElement as Element) : -1;
-      for (const old of this.actionsEl.querySelectorAll<HTMLElement>('[data-hinted]')) this.forget(old);
+      this.hints.forgetWithin(this.actionsEl);
       this.volumeChip = null;
       this.actionsEl.replaceChildren(
         ...specs.map((c) => {
@@ -629,7 +542,7 @@ export class Player {
             if (performance.now() - born < CHIP_SETTLE_MS) return;
             c.onClick(b);
           });
-          this.hint(b, c.hint);
+          this.hints.add(b, c.hint);
           return b;
         }),
       );
@@ -642,21 +555,14 @@ export class Player {
     });
   }
 
-  private forget(el: HTMLElement): void {
-    const n = Number(el.dataset.hinted);
-    this.hinted.get(n)?.desc.remove();
-    this.hinted.delete(n);
-    if (this.hovered === el) this.hovered = null;
-    if (this.focused === el) this.focused = null;
-  }
-
   private chipSpecs(s: Snapshot): ChipSpec[] {
     const session = this.session;
-    const menuChip = (nodes: () => MenuNode[]) => async (b: HTMLButtonElement) => {
-      b.setAttribute('aria-expanded', 'true');
-      const id = await popup(nodes(), b);
-      b.setAttribute('aria-expanded', 'false');
-      if (id) await handleMenuId(id, session, this.actions, async () => null);
+    // The length and beat chips open their sheets, and close them again.
+    const sheetChip = (name: SheetName) => (b: HTMLButtonElement) => this.actions.toggleSheet(name, b);
+    const opens = (b: HTMLButtonElement, name: SheetName) => {
+      b.dataset.sheet = name;
+      b.setAttribute('aria-haspopup', 'dialog');
+      b.setAttribute('aria-expanded', String(sheetIs(this.sheetName, name)));
     };
     const resume: ChipSpec = {
       className: 'btn btn--primary', label: 'Resume', key: 'resume',
@@ -678,14 +584,14 @@ export class Player {
             className: 'chip', label: `Length: ${lengthWords(s.prefs.minutes)}`, key: 'length',
             hint: () => {
               const m = this.snap?.prefs.minutes ?? null;
-              return [{ b: m === null ? 'Open-ended.' : `${minutesWord(m)}.` }, { t: 'Click to change.' }, { k: '+' }, { k: '−' }];
+              return [{ b: m === null ? 'Open-ended.' : `${minutesWord(m)}.` }, { t: 'Length and more.' }, { k: '+' }, { k: '−' }];
             },
             build: (b) => {
               const m = s.prefs.minutes;
-              b.setAttribute('aria-haspopup', 'menu');
-              b.replaceChildren(uiIcon(m === null ? 'open-ended' : 'clock'), ...(m === null ? ['Open-ended'] : [h('span', { class: 'num' }, String(m)), ' min']));
+              opens(b, 'session');
+              b.replaceChildren(uiIcon(m === null ? 'open-ended' : 'clock'), m === null ? 'Open-ended' : h('span', {}, h('span', { class: 'num' }, String(m)), ' min'));
             },
-            onClick: menuChip(() => lengthMenu(session.snapshot())),
+            onClick: sheetChip('session'),
           },
           {
             className: 'chip', label: `Beat: ${beatLong(s.params)}`, key: 'beat',
@@ -694,10 +600,10 @@ export class Player {
               return [{ b: h.b }, { t: h.t }, { k: keys('⌘B') }];
             },
             build: (b) => {
-              b.setAttribute('aria-haspopup', 'menu');
+              opens(b, 'beat');
               b.replaceChildren(uiIcon(s.params.beatOn ? 'beat' : 'beat-off'), beatName(s.params));
             },
-            onClick: menuChip(() => beatMenu(session.snapshot())),
+            onClick: sheetChip('beat'),
           },
         ];
       case 'playing':
@@ -825,45 +731,59 @@ export class Player {
     return true;
   }
 
-  // ---------- hint line ----------
-
-  private paintHint(): void {
-    const s = this.snap;
-    if (!s) return;
-    const target = this.hovered ?? this.focused;
-    const hint: Hint = (target && this.hintFor(target)) || [{ t: description(s, this.firstRun) }];
-    const key = JSON.stringify(hint);
-    if (key === this.hintKey) return;
-    const first = this.hintKey === '';
-    this.hintKey = key;
-    const draw = () => {
-      this.hintEl.replaceChildren(
-        ...hint.flatMap((p, i) => {
-          const sp = i ? [' '] : [];
-          if ('b' in p) return [...sp, h('b', {}, p.b)];
-          if ('k' in p) return [...sp, h('kbd', {}, p.k)];
-          return [...sp, p.t];
-        }),
-      );
-    };
-    if (this.hintTimer) clearTimeout(this.hintTimer);
-    if (first || reducedMotion()) {
-      draw();
-      this.hintEl.removeAttribute('data-swapping');
-      return;
-    }
-    // 120 ms out, 120 ms in.
-    this.hintEl.dataset.swapping = '';
-    this.hintTimer = setTimeout(() => {
-      draw();
-      this.hintEl.removeAttribute('data-swapping');
-    }, 120);
-  }
-
   // ---------- modes of the window ----------
 
-  setExpanded(on: boolean): void {
-    this.shapeBtn.setAttribute('aria-expanded', String(on));
+  /** The light: where focus goes when nothing better is left. */
+  lightButton(): HTMLButtonElement {
+    return this.ripple;
+  }
+
+  /** Which sheet is open under the player: its opener shows it, and says so to VoiceOver. */
+  setSheet(name: SheetName | null): void {
+    this.sheetName = name;
+    this.shapeBtn.setAttribute('aria-expanded', String(sheetIs(name, 'shape')));
+    this.helpBtn.setAttribute('aria-expanded', String(name === 'guide'));
+    for (const b of [this.eyebrowBtn, this.nameBtn]) b.setAttribute('aria-expanded', String(name === 'sound'));
+    for (const b of this.actionsEl.querySelectorAll<HTMLButtonElement>('[data-sheet]')) {
+      b.setAttribute('aria-expanded', String(sheetIs(name, b.dataset.sheet as SheetName)));
+    }
+  }
+
+  /** The Field guide's numbers, beside (never over) the controls they describe. */
+  setBadges(on: boolean): void {
+    if (on && this.badgeLayer.hidden) {
+      // Made once, faded in once; afterwards they only move.
+      this.badgeLayer.replaceChildren(...[1, 2, 3, 4, 5, 6].map((n) => h('span', { class: 'badge' }, String(n))));
+    }
+    this.badgeLayer.hidden = !on;
+    if (on) this.placeBadges();
+  }
+
+  private placeBadges(): void {
+    const box = this.main.getBoundingClientRect();
+    const at = (el: Element | null, side: 'left' | 'right' | 'corner'): { x: number; y: number } | null => {
+      if (!el || el.closest('[hidden]')) return null;
+      const r = el.getBoundingClientRect();
+      if (!r.width) return null;
+      const y = side === 'corner' ? r.top + 2 : r.top + r.height / 2 - 9;
+      const x = side === 'left' ? r.left - 21 : side === 'right' ? r.right + 3 : r.left + 2;
+      return { x: x - box.left, y: y - box.top };
+    };
+    const chips = this.actionsEl.querySelectorAll('[data-sheet]');
+    const spots = [
+      at(this.ripple, 'corner'),
+      at(this.eyebrowBtn.hidden ? this.eyebrowText : this.eyebrowBtn, 'left'),
+      at(this.nameBtn, 'left'),
+      at(chips[0] ?? null, 'left'),
+      at(chips[1] ?? null, 'right'),
+      at(this.shapeBtn.parentElement, 'left'),
+    ];
+    spots.forEach((p, i) => {
+      const badge = this.badgeLayer.children[i] as HTMLElement | undefined;
+      if (!badge) return;
+      badge.hidden = !p;
+      if (p) badge.style.transform = `translate(${Math.round(p.x)}px,${Math.round(p.y)}px)`;
+    });
   }
 
   setMini(on: boolean): void {

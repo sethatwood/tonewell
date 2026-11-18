@@ -246,8 +246,10 @@ fn audio_output() -> Option<output::OutputInfo> {
 /// Diagnostics for automated checks: TONEWELL_AUTOSTART=1 starts a session at launch,
 /// TONEWELL_HIDE=1 hides the window once it has started, TONEWELL_PRESET picks a preset,
 /// TONEWELL_LOG=1 prints the scheduler's health every ten seconds, TONEWELL_MINUTES sets the
-/// session length. TONEWELL_OPEN runs steps in order: open a window or mode (expand, visuals,
-/// learn, settings, mini, full), wait two seconds (pause), check for and download an update
+/// session length. TONEWELL_OPEN runs steps in order: open a window or mode (visuals, learn,
+/// settings, mini, full), open a sheet under the player (sheet-sound, sheet-session,
+/// sheet-beat, sheet-custom, sheet-shape, sheet-all, sheet-guide, sheet-name) or close it
+/// (sheet-close), wait two seconds (pause), check for and download an update
 /// (update-check), install it and restart (update-restart), or quit as ⌘Q does (quit).
 #[tauri::command]
 fn debug_flags() -> serde_json::Value {

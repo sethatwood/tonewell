@@ -33,7 +33,7 @@ const beatHz = (v: number) => `${v < 10 ? v.toFixed(1) : Math.round(v)} Hz ${ban
 
 function macroWord(v: number, low: string, high: string): string {
   const d = v - 0.5;
-  if (Math.abs(d) < 0.03) return 'as designed';
+  if (Math.abs(d) < 0.03) return 'as made';
   const amount = Math.abs(d) > 0.35 ? 'much ' : Math.abs(d) > 0.15 ? '' : 'a little ';
   return amount + (d < 0 ? low : high);
 }
@@ -97,7 +97,7 @@ export const PARAMS = {
   // Bells
   bellsOn: toggle('bells', 'Bells', 1),
   bellsLevel: range('bells', 'Level', 0, 1, 0.5, 0.01),
-  bellsDensity: range('bells', 'How often', 1, 40, 16, 0.5, { format: (v) => `${Math.round(v)} a minute`, drift: 0.25 }),
+  bellsDensity: range('bells', 'How often', 1, 40, 16, 0.5, { format: (v) => `${Math.round(v)} a min`, drift: 0.25 }),
   bellsRegister: range('bells', 'Register', -1, 2, 0, 1, { format: (v) => (v === 0 ? 'middle' : v < 0 ? 'low' : v === 1 ? 'high' : 'highest') }),
   bellsDecay: range('bells', 'Ring', 1, 12, 5, 0.1, { format: (v) => `${v.toFixed(1)} s` }),
   bellsScale: choice('bells', 'Scale', BELL_SCALES.map((s) => s.name)),
@@ -143,9 +143,9 @@ export const PARAMS = {
   driftAmount: range('drift', 'Drift', 0, 1, 0.3, 0.01, { help: 'Lets the filter, breath, bells and space wander slowly on their own.' }),
   driftSpeed: range('drift', 'Drift speed', 0.25, 4, 1, 0.05, { scale: 'log', format: (v) => `${v.toFixed(2)}×` }),
 
-  // Macros shown in the mini player. Both are centered on the preset as designed.
-  warmth: range('macro', 'Warmth', 0, 1, 0.5, 0.01, { format: (v) => macroWord(v, 'warmer', 'brighter'), help: 'Warm at the left, bright at the right. The middle is the preset as designed.' }),
-  motion: range('macro', 'Drift', 0, 1, 0.5, 0.01, { format: (v) => macroWord(v, 'stiller', 'wandering'), help: 'Still at the left, wandering at the right: drift, root walk, bells and sweep together.' }),
+  // The feel pad in the Shape sheet: Warmth across, Motion up and down, both centered on the sound as made.
+  warmth: range('macro', 'Warmth', 0, 1, 0.5, 0.01, { format: (v) => macroWord(v, 'warmer', 'brighter'), help: 'Warm at the left, bright at the right. The middle is the sound as made.' }),
+  motion: range('macro', 'Motion', 0, 1, 0.5, 0.01, { format: (v) => macroWord(v, 'stiller', 'wandering'), help: 'Still at the bottom, wandering at the top: drift, the root’s wander, bells and sweep together.' }),
 } satisfies Record<string, ParamDef>;
 
 export type ParamId = keyof typeof PARAMS;

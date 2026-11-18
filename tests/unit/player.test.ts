@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Session, type Notice, type Snapshot } from '../../src/session/session';
-import { description, restMessage, soundMenu } from '../../src/ui/player';
+import { description, restMessage } from '../../src/ui/player';
+import { soundMenu } from '../../src/ui/tray';
 import { BEAT_CHOICES, beatHint, beatName, choiceParams } from '../../src/ui/beats';
 import { BUILTIN_PRESETS } from '../../src/presets/builtin';
 import { defaultParams } from '../../src/audio/params';
@@ -69,10 +70,11 @@ describe('the beat chip', () => {
     expect(beatHint({ ...defaultParams(), beatOn: 1, rampOn: 0, beatHz: 7.5 })).toEqual({ b: '7.5 Hz,', t: 'set by hand.' });
   });
 
-  it('the sound menu offers both modes and only known actions', () => {
+  it('the menu bar’s sound menu lists the mode’s sounds, then keeping one and the sheet', () => {
     const ids = soundMenu(session, base).flatMap((n) => (n.kind === 'check' || n.kind === 'item' ? [n.id] : []));
-    expect(ids.slice(0, 2)).toEqual(['mode:meditate', 'mode:focus']);
-    for (const id of ids) expect(id).toMatch(/^(mode:(meditate|focus)|preset:.+|preset-.+)$/);
+    expect(ids[0]).toBe('header:meditate');
+    expect(ids.slice(-2)).toEqual(['preset-save-as', 'sound-sheet']);
+    for (const id of ids) expect(id).toMatch(/^(header:.+|preset:.+|preset-.+|sound-sheet)$/);
   });
 });
 

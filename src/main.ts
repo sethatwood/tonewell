@@ -3,10 +3,9 @@
 
 import { Session, type Notice, type Phase } from './session/session';
 import { Player, handleMenuId, type PlayerActions } from './ui/player';
-import { Panel } from './ui/panel';
+import { SheetHost, sheetBuilders, type SheetName } from './ui/sheets';
 import { invalidateTray, trayError, updateTray, type TrayOptions } from './ui/tray';
 import { check, item, popup, sep, submenu } from './ui/menu';
-import { h } from './ui/controls';
 import { currentWindow, emitTo, invoke, isTauri, isWindowOpen, listen, openWindow } from './platform/bridge';
 import { flushNow } from './platform/store';
 import {
@@ -20,7 +19,6 @@ const session = new Session();
 const app = document.getElementById('app')!;
 const root = document.documentElement;
 let settings: AppSettings;
-let expanded = false;
 /** Mini mode: the light alone, 112 px, floating where it was. */
 let mini = false;
 /** The state mini mode is heading to, and the transition running towards it, if any. */
@@ -32,7 +30,6 @@ let lastPhase: Phase = 'ready';
 let micBusy = false;
 
 const PLAYER = { width: 380, height: 156 };
-const EXPANDED_HEIGHT = 744;
 /**
  * Mini mode's window: the player's top-left corner down to the bottom-right
  * of its light (15 + 112 by 22 + 112). The light keeps its place inside it,
@@ -41,52 +38,6 @@ const EXPANDED_HEIGHT = 744;
  * redrawn until the animation ends). Outside the light it's transparent.
  */
 const MINI = { width: 127, height: 134 };
-
-// ---------- small dialog for naming presets ----------
-
-function ask(question: string, initial: string): Promise<string | null> {
-  // Asked from the menu bar, the window may be hidden: bring it forward first.
-  void currentWindow().then(async (w) => {
-    await w?.show();
-    await w?.setFocus();
-  });
-  const returnFocus = document.activeElement as HTMLElement | null;
-  const wasExpanded = expanded;
-  return new Promise((resolve) => {
-    const input = h('input', { type: 'text', value: initial, id: 'ask-input', autocomplete: 'off', spellcheck: 'false' });
-    const cancel = h('button', { type: 'button', class: 'btn quiet' }, 'Cancel');
-    const ok = h('button', { type: 'submit', class: 'btn primary' }, 'Save');
-    const form = h('form', {}, h('label', { for: 'ask-input' }, question), input, h('div', { class: 'ask-actions' }, cancel, ok));
-    const wrap = h('div', { class: 'ask', role: 'dialog', 'aria-modal': 'true', 'aria-label': question }, form);
-    const close = (v: string | null) => {
-      wrap.remove();
-      if (!wasExpanded) void setExpanded(false);
-      returnFocus?.focus();
-      resolve(v);
-    };
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      close(input.value.trim() || null);
-    });
-    cancel.addEventListener('click', () => close(null));
-    wrap.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        close(null);
-      } else if (e.key === 'Tab') {
-        // Keep focus inside the dialog.
-        const items = [input, cancel, ok];
-        const i = items.indexOf(document.activeElement as HTMLInputElement & HTMLButtonElement);
-        e.preventDefault();
-        items[(i + (e.shiftKey ? items.length - 1 : 1)) % items.length].focus();
-      }
-    });
-    if (!expanded) void setExpanded(true);
-    document.body.append(wrap);
-    input.select();
-    input.focus();
-  });
-}
 
 // ---------- windows ----------
 
@@ -108,6 +59,8 @@ async function setFrame(width: number, height: number, dx = 0, dy = 0, animate =
     if (mon) {
       const k = mon.scaleFactor;
       const area = { x: mon.workArea.position.x / k, y: mon.workArea.position.y / k, w: mon.workArea.size.width / k, h: mon.workArea.size.height / k };
+      // Never taller than the screen: a sheet scrolls inside instead.
+      height = Math.min(height, Math.max(PLAYER.height, area.h - 16));
       const x = pos.x / k + dx;
       const y = pos.y / k + dy;
       const nx = Math.min(Math.max(x, area.x), area.x + area.w - width);
@@ -124,19 +77,50 @@ async function setFrame(width: number, height: number, dx = 0, dy = 0, animate =
   });
 }
 
-async function resize(): Promise<void> {
-  if (mini) return;
-  await setFrame(PLAYER.width, expanded ? EXPANDED_HEIGHT : PLAYER.height);
+/** Where the window was before a sheet first grew it, and where growing left it. */
+let sheetOrigin: { x: number; y: number } | null = null;
+let sheetPlaced: { x: number; y: number } | null = null;
+/** Sheet resizes, one after another, so a quick open-and-close can't cross over. */
+let frameChain: Promise<void> = Promise.resolve();
+
+async function logicalPosition(): Promise<{ x: number; y: number } | null> {
+  const w = await currentWindow();
+  if (!w) return null;
+  try {
+    const p = await w.outerPosition();
+    const k = await w.scaleFactor();
+    return { x: p.x / k, y: p.y / k };
+  } catch {
+    return null;
+  }
 }
 
-async function setExpanded(on: boolean): Promise<void> {
-  // Out of mini mode first, waiting for any shrink or grow under way to finish.
-  if (on && (mini || miniRun)) await setMini(false);
-  expanded = on;
-  app.classList.toggle('expanded', on);
-  player.setExpanded(on);
-  if (on) panel.render(session.snapshot());
-  await resize();
+/**
+ * Make room for a sheet under the player (0: just the player). The top edge
+ * stays put unless the sheet would run off the bottom of the screen; then the
+ * window moves up, and moves back down when the sheet closes, if it hasn't
+ * been dragged meanwhile.
+ */
+function resizeForSheet(sheetHeight: number): Promise<void> {
+  const step = async () => {
+    if (mini) return;
+    const before = await logicalPosition();
+    const stayed = (p: { x: number; y: number } | null) => !!(before && p && Math.abs(before.y - p.y) < 2 && Math.abs(before.x - p.x) < 2);
+    if (sheetHeight > 0) {
+      // Dragged since the last resize: where it was put is where it goes back to.
+      if (!sheetOrigin || (sheetPlaced && !stayed(sheetPlaced))) sheetOrigin = before;
+      await setFrame(PLAYER.width, PLAYER.height + sheetHeight);
+      sheetPlaced = await logicalPosition();
+    } else {
+      const dy = stayed(sheetPlaced) && sheetOrigin && before ? sheetOrigin.y - before.y : 0;
+      await setFrame(PLAYER.width, PLAYER.height, 0, dy);
+      sheetOrigin = null;
+      sheetPlaced = null;
+    }
+  };
+  // One failed resize must not stop the ones after it.
+  frameChain = frameChain.then(step).catch((err) => console.warn('Tonewell: resize failed', err));
+  return frameChain;
 }
 
 /**
@@ -161,11 +145,9 @@ function setMini(on: boolean, save = true): Promise<void> {
 
 async function stepMini(on: boolean): Promise<void> {
   if (on) {
-    if (expanded) {
-      expanded = false;
-      app.classList.remove('expanded');
-      player.setExpanded(false);
-      await resize();
+    if (sheets.isOpen) {
+      sheets.closeNow();
+      await resizeForSheet(0);
     }
     mini = true;
     player.setMini(true);
@@ -203,11 +185,19 @@ async function snapTo(corner: 'tl' | 'tr' | 'bl' | 'br'): Promise<void> {
   await w.setPosition(new PhysicalPosition(x, y));
 }
 
+/** Bring the player forward (it may be hidden, asked from the menu bar), then open a sheet. */
+async function showSheet(name: SheetName, arg?: unknown): Promise<void> {
+  const w = await currentWindow();
+  if (w && !(await w.isVisible().catch(() => true))) await w.show();
+  await w?.setFocus();
+  await sheets.open(name, null, arg);
+}
+
 const actions: PlayerActions = {
-  toggleExpanded: () => void setExpanded(!expanded),
+  toggleSheet: (name, opener) => sheets.toggle(name, opener),
+  openSheet: (name, arg) => void showSheet(name, arg),
   toggleMini: () => void setMini(!miniTarget),
   startDrag: () => void currentWindow().then((w) => w?.startDragging()),
-  expand: () => void setExpanded(true),
   openVisuals: () => void openVisuals(),
   openLearn: (card) => void openLearn(card),
   openSettings: () =>
@@ -234,9 +224,11 @@ async function contextMenu(anchor: HTMLElement, at?: { x: number; y: number }): 
       submenu('Snap to corner', [item('ctx:snap-tl', 'Top left'), item('ctx:snap-tr', 'Top right'), item('ctx:snap-bl', 'Bottom left'), item('ctx:snap-br', 'Bottom right')]),
       check('ctx:mini', `Mini player    ${keys('⌘M')}`, mini),
       sep,
-      item('ctx:learn', 'Learn'),
-      item('ctx:settings', 'Settings…'),
-      item('ctx:hide', 'Hide window'),
+      item('ctx:guide', 'Field guide    ?'),
+      item('ctx:learn', `Learn    ${keys('⌘L')}`),
+      item('ctx:settings', `Settings…    ${keys('⌘,')}`),
+      sep,
+      item('ctx:hide', `Hide window    ${keys('⌘W')}`),
     ],
     anchor,
     at,
@@ -245,6 +237,7 @@ async function contextMenu(anchor: HTMLElement, at?: { x: number; y: number }): 
   if (id === 'ctx:top') await applySettings({ ...settings, alwaysOnTop: !settings.alwaysOnTop }, true);
   else if (id === 'ctx:mini') await setMini(!miniTarget);
   else if (id.startsWith('ctx:snap-')) await snapTo(id.slice(9) as 'tl');
+  else if (id === 'ctx:guide') await sheets.open('guide', null);
   else if (id === 'ctx:learn') actions.openLearn();
   else if (id === 'ctx:settings') actions.openSettings();
   else if (id === 'ctx:hide') actions.hideWindow();
@@ -331,15 +324,25 @@ async function runAction(action: string): Promise<void> {
       updateLaterUntil = Infinity;
       return;
     default:
-      await handleMenuId(action, session, actions, ask);
+      await handleMenuId(action, session, actions);
   }
 }
 
 // ---------- rendering ----------
 
-const player = new Player(session, actions, ask);
-const panel = new Panel(session, (card) => void openLearn(card), ask);
-player.sheet.append(panel.el);
+const player = new Player(session, actions);
+const sheets = new SheetHost(player.sheet, session, sheetBuilders((on) => player.setBadges(on)), {
+  resize: resizeForSheet,
+  leaveMini: async () => {
+    if (mini || miniRun) await setMini(false);
+  },
+  openLearn: (card) => void openLearn(card),
+  changed: (name) => {
+    player.setSheet(name);
+    app.dataset.sheet = name ?? '';
+  },
+  fallbackFocus: () => player.lightButton(),
+});
 app.append(player.el);
 
 let mediaKey = '';
@@ -380,7 +383,7 @@ function render(): void {
   root.dataset.phase = s.paused ? 'paused' : s.phase;
   setSounding(s.phase);
   player.render(s);
-  if (expanded) panel.render(s);
+  sheets.render(s);
   if (settings) void updateTray(session, s, trayOptions());
   if (s.phase === 'ready' && lastPhase !== 'ready' && s.timerDone && !s.notice) {
     session.setNotice({ kind: 'done', text: `Done, ${s.prefs.minutes ?? ''} min.`.replace(' , min', ''), ttl: 10 });
@@ -412,6 +415,7 @@ function trayOptions(): TrayOptions {
     shortcuts: settings.shortcutsEnabled,
     showTime: settings.showTimeInMenuBar,
     update: update?.state === 'ready' ? update.version : null,
+    beatNow: session.phase === 'playing' ? session.beatHzNow() : null,
   };
 }
 
@@ -516,23 +520,32 @@ async function startUpdates(): Promise<void> {
 }
 
 // For the browser checks in development only; never in a built app.
-if (import.meta.env.DEV) Object.assign(window, { __tonewell: { session, player, setMini, setExpanded } });
+if (import.meta.env.DEV) Object.assign(window, { __tonewell: { session, player, sheets, setMini } });
 
 // ---------- keyboard ----------
 
 addEventListener('keydown', (e) => {
-  if (document.querySelector('.ask')) return;
   const mod = e.metaKey || e.ctrlKey;
   const key = e.key;
   const inText = (e.target as HTMLElement).matches?.('input[type="text"]');
   if (key === 'Escape') {
     if (document.querySelector('.pop')) return;
     e.preventDefault();
+    // The volume row, then a sheet, take Esc before the stop ladder does.
     if (player.handleEscape()) return;
+    if (!e.repeat && sheets.escape()) return;
+    if (sheets.isOpen) return;
     session.escape(e.repeat);
     return;
   }
   if (inText) return;
+  // The naming sheet keeps the keyboard to itself (Esc, Tab and Return are its own).
+  if (sheets.name === 'name') return;
+  if (!mod && key === '?') {
+    e.preventDefault();
+    sheets.toggle('guide', null);
+    return;
+  }
   if (!mod && key === ' ' && (document.activeElement === document.body || document.activeElement === null)) {
     e.preventDefault();
     void session.go();
@@ -549,7 +562,7 @@ addEventListener('keydown', (e) => {
   else if (mod && key === '1') session.setMode('meditate');
   else if (mod && key === '2') session.setMode('focus');
   else if (mod && key.toLowerCase() === 'b') session.setParam('beatOn', session.params.beatOn ? 0 : 1);
-  else if (mod && key.toLowerCase() === 'e') void setExpanded(!expanded);
+  else if (mod && key.toLowerCase() === 'e') sheets.toggle('shape', null);
   else if (mod && e.shiftKey && key.toLowerCase() === 'v') void openVisuals();
   else if (mod && key.toLowerCase() === 'l') void openLearn();
   else if (mod && key === ',') actions.openSettings();
@@ -581,11 +594,10 @@ setInterval(async () => {
   if (visualsOpen && isTauri) visualsOpen = await isWindowOpen('visuals');
 }, 3000);
 
-// The menu bar's minutes-left title counts down (updates only when the text changes).
+// The menu bar's minutes-left title counts down, and the Beat item follows a glide
+// (both send only when the text changes).
 setInterval(() => {
-  if (settings?.showTimeInMenuBar && session.phase === 'playing') {
-    void updateTray(session, session.snapshot(), { ...trayOptions(), showTime: true });
-  }
+  if (settings && session.phase === 'playing') void updateTray(session, session.snapshot(), trayOptions());
 }, 15000);
 
 // ---------- boot ----------
@@ -663,7 +675,8 @@ async function diagnostics(): Promise<void> {
   const log = (line: string) => void invoke('debug_log', { line });
   for (const name of (flags.open ?? '').split(',').filter(Boolean)) {
     try {
-      if (name === 'expand') await setExpanded(true);
+      if (name === 'sheet-close') await sheets.close();
+      else if (name.startsWith('sheet-')) await sheets.open(name.slice(6) as SheetName);
       else if (name === 'mini') await setMini(true, false);
       else if (name === 'full') await setMini(false, false);
       else if (name === 'pause') await new Promise((r) => setTimeout(r, 2000));
