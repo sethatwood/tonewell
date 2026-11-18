@@ -1,34 +1,34 @@
 {
-  "version": "0.1.0",
-  "pub_date": "2026-11-18T03:25:47Z",
+  "version": "0.2.0",
+  "pub_date": "2026-11-18T06:39:27Z",
   "platforms": {
     "darwin-aarch64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRVzk5WU1wanNMbUNrakc5eXdsS09xb3poVzFHLzdoWjE3dWI3T2l4UjZkbHZMZCtZUU1sdUhQZHQwWVR0Q2VzT1JnYkt5NEUyVVVULzk5QjZVaGVibnVwSUFBcXVPQUFZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0OTcyMzQ2CWZpbGU6VG9uZXdlbGxfMC4xLjBfdW5pdmVyc2FsLmFwcC50YXIuZ3oJdmVyc2lvbjowLjEuMAoxTUtHR0pJbUowMWVvaFZPY3Ridzg3WkNpR2NPVVMzZDF1T1l2SG1DNHFIOFg5dWdJRXRxM2p6OEhrcUE5KzBDdy82aDdoV0dWR3pOem1QdVQ0UGNBQT09Cg==",
-      "url": "https://github.com/sethatwood/tonewell/releases/download/v0.1.0/Tonewell_0.1.0_universal.app.tar.gz"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRVzk5WU1wanNMbUJSaWJyVWhPOTJJeHJkQlNmYU14ZHk0NzVpTWt6NFVoRVlRMFZtemQ4RWIyTm0xYXBnMWlWZnVJemNVUXNVWTNIUFhtSE1EcGZ0WTkxVGFOQjZhQ0FFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0OTgzOTY2CWZpbGU6VG9uZXdlbGxfMC4yLjBfdW5pdmVyc2FsLmFwcC50YXIuZ3oJdmVyc2lvbjowLjIuMApzMXRXUHJjNjJlVjhuSGwvM1BlekVxR240Y0Jia0V3aU0vMTA2TDFocDRFeGdGV2ZYb29tTk5VdVVYVVdNVVFEeW9pRlA2RFkrOGh4WVJXWHhsVlZDZz09Cg==",
+      "url": "https://github.com/sethatwood/tonewell/releases/download/v0.2.0/Tonewell_0.2.0_universal.app.tar.gz"
     },
     "darwin-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRVzk5WU1wanNMbUNrakc5eXdsS09xb3poVzFHLzdoWjE3dWI3T2l4UjZkbHZMZCtZUU1sdUhQZHQwWVR0Q2VzT1JnYkt5NEUyVVVULzk5QjZVaGVibnVwSUFBcXVPQUFZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0OTcyMzQ2CWZpbGU6VG9uZXdlbGxfMC4xLjBfdW5pdmVyc2FsLmFwcC50YXIuZ3oJdmVyc2lvbjowLjEuMAoxTUtHR0pJbUowMWVvaFZPY3Ridzg3WkNpR2NPVVMzZDF1T1l2SG1DNHFIOFg5dWdJRXRxM2p6OEhrcUE5KzBDdy82aDdoV0dWR3pOem1QdVQ0UGNBQT09Cg==",
-      "url": "https://github.com/sethatwood/tonewell/releases/download/v0.1.0/Tonewell_0.1.0_universal.app.tar.gz"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRVzk5WU1wanNMbUJSaWJyVWhPOTJJeHJkQlNmYU14ZHk0NzVpTWt6NFVoRVlRMFZtemQ4RWIyTm0xYXBnMWlWZnVJemNVUXNVWTNIUFhtSE1EcGZ0WTkxVGFOQjZhQ0FFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0OTgzOTY2CWZpbGU6VG9uZXdlbGxfMC4yLjBfdW5pdmVyc2FsLmFwcC50YXIuZ3oJdmVyc2lvbjowLjIuMApzMXRXUHJjNjJlVjhuSGwvM1BlekVxR240Y0Jia0V3aU0vMTA2TDFocDRFeGdGV2ZYb29tTk5VdVVYVVdNVVFEeW9pRlA2RFkrOGh4WVJXWHhsVlZDZz09Cg==",
+      "url": "https://github.com/sethatwood/tonewell/releases/download/v0.2.0/Tonewell_0.2.0_universal.app.tar.gz"
     },
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRVzk5WU1wanNMbU1IT0VSUmZxSUJuTlBiZlZzeTVCVWFFOGphM0dRSnZKd25JYXExQXV0d2FkM2RoVVd0cS8rb3BmNm04WU44UkMrNFY5bk5lTDQrUWoraFZMcHY4L3dvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0OTcyMzQ2CWZpbGU6VG9uZXdlbGxfMC4xLjBfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjAuMS4wCjd1bjVIbzFVSWxvVE5KSkRLb2ZRRm1kRDQ1TFo3K2YxTXJPZjZ1UndVOGtreWh4ZUgzZ1p6bFErVHI0UjdZOHd0cXFYVEFsUU5vNU5NQzc1V0k5V0R3PT0K",
-      "url": "https://github.com/sethatwood/tonewell/releases/download/v0.1.0/Tonewell_0.1.0_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRVzk5WU1wanNMbU1adStOdVhyTkpOMDNPRmk0Z0NHb3lWQ0R4TTU1bXJIZmdZandJbWovNFQ5Unpvb3krSHoyQjExUnZaa1BoRWljY1J3Sjd0c3dHZlZNNUdKcVVFd2dnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0OTgzOTY3CWZpbGU6VG9uZXdlbGxfMC4yLjBfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjAuMi4wCnN1aXlKK3VUUXovVHBVaVd2WXRrdWd6ZmxEOGtGbm1GWGhkSS90YUxwYlVlWkRHS0hHWWF0MUI0akhSTTZ2Q25mWll1THAwZ3QyZHVOSE1VQjY4YURRPT0K",
+      "url": "https://github.com/sethatwood/tonewell/releases/download/v0.2.0/Tonewell_0.2.0_x64-setup.exe"
     },
     "windows-x86_64-nsis": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRVzk5WU1wanNMbU1IT0VSUmZxSUJuTlBiZlZzeTVCVWFFOGphM0dRSnZKd25JYXExQXV0d2FkM2RoVVd0cS8rb3BmNm04WU44UkMrNFY5bk5lTDQrUWoraFZMcHY4L3dvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0OTcyMzQ2CWZpbGU6VG9uZXdlbGxfMC4xLjBfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjAuMS4wCjd1bjVIbzFVSWxvVE5KSkRLb2ZRRm1kRDQ1TFo3K2YxTXJPZjZ1UndVOGtreWh4ZUgzZ1p6bFErVHI0UjdZOHd0cXFYVEFsUU5vNU5NQzc1V0k5V0R3PT0K",
-      "url": "https://github.com/sethatwood/tonewell/releases/download/v0.1.0/Tonewell_0.1.0_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRVzk5WU1wanNMbU1adStOdVhyTkpOMDNPRmk0Z0NHb3lWQ0R4TTU1bXJIZmdZandJbWovNFQ5Unpvb3krSHoyQjExUnZaa1BoRWljY1J3Sjd0c3dHZlZNNUdKcVVFd2dnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0OTgzOTY3CWZpbGU6VG9uZXdlbGxfMC4yLjBfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjAuMi4wCnN1aXlKK3VUUXovVHBVaVd2WXRrdWd6ZmxEOGtGbm1GWGhkSS90YUxwYlVlWkRHS0hHWWF0MUI0akhSTTZ2Q25mWll1THAwZ3QyZHVOSE1VQjY4YURRPT0K",
+      "url": "https://github.com/sethatwood/tonewell/releases/download/v0.2.0/Tonewell_0.2.0_x64-setup.exe"
     },
     "linux-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRVzk5WU1wanNMbUtzeGxFeWJyVUhUNkplU2xhZkZDT2dtNmlSdkJnVjFHYUNrTnRFZC94MWdvOExoeXRyRWJHVGxyNHhHU2ZrYUF2UGpKdU9pSUhmdGpvODZ4UDFUK2dzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0OTcyMzQ2CWZpbGU6VG9uZXdlbGxfMC4xLjBfYW1kNjQuQXBwSW1hZ2UJdmVyc2lvbjowLjEuMApQTThCcWUvYWFyQ1hRK0Z1UCtCNCtLMEpHWmpmZEdnSkNGQU44allwaWhhM2J3Z1psRDVCY1lERVNVZlJ2L29LTEJ1ZEUxT2JxWUdpL0FrUEVNY3pDdz09Cg==",
-      "url": "https://github.com/sethatwood/tonewell/releases/download/v0.1.0/Tonewell_0.1.0_amd64.AppImage"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRVzk5WU1wanNMbVBEaTdRVzBDemtCYWIxcHhyNjM3Q2Rlc1hsQjVDUndJODArcW41cWdoKzVOQUxFNUh2ekZ1d3lwTElqM2tOL1orVEZzTEdQajRRUTlEbTByWjhiemdVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0OTgzOTY3CWZpbGU6VG9uZXdlbGxfMC4yLjBfYW1kNjQuQXBwSW1hZ2UJdmVyc2lvbjowLjIuMAo1bmc2TndxeWNXZE4vUHZPbDFqbml5U2RYajlrSEVlYXJkUWF5VEZOVWdoa1NvVnowdmxEZlF5NTZuTXcrSVhBNDdEdHJ1eERMZ2dmMEcxMXhnK0xCQT09Cg==",
+      "url": "https://github.com/sethatwood/tonewell/releases/download/v0.2.0/Tonewell_0.2.0_amd64.AppImage"
     },
     "linux-x86_64-appimage": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRVzk5WU1wanNMbUtzeGxFeWJyVUhUNkplU2xhZkZDT2dtNmlSdkJnVjFHYUNrTnRFZC94MWdvOExoeXRyRWJHVGxyNHhHU2ZrYUF2UGpKdU9pSUhmdGpvODZ4UDFUK2dzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0OTcyMzQ2CWZpbGU6VG9uZXdlbGxfMC4xLjBfYW1kNjQuQXBwSW1hZ2UJdmVyc2lvbjowLjEuMApQTThCcWUvYWFyQ1hRK0Z1UCtCNCtLMEpHWmpmZEdnSkNGQU44allwaWhhM2J3Z1psRDVCY1lERVNVZlJ2L29LTEJ1ZEUxT2JxWUdpL0FrUEVNY3pDdz09Cg==",
-      "url": "https://github.com/sethatwood/tonewell/releases/download/v0.1.0/Tonewell_0.1.0_amd64.AppImage"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRVzk5WU1wanNMbVBEaTdRVzBDemtCYWIxcHhyNjM3Q2Rlc1hsQjVDUndJODArcW41cWdoKzVOQUxFNUh2ekZ1d3lwTElqM2tOL1orVEZzTEdQajRRUTlEbTByWjhiemdVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0OTgzOTY3CWZpbGU6VG9uZXdlbGxfMC4yLjBfYW1kNjQuQXBwSW1hZ2UJdmVyc2lvbjowLjIuMAo1bmc2TndxeWNXZE4vUHZPbDFqbml5U2RYajlrSEVlYXJkUWF5VEZOVWdoa1NvVnowdmxEZlF5NTZuTXcrSVhBNDdEdHJ1eERMZ2dmMEcxMXhnK0xCQT09Cg==",
+      "url": "https://github.com/sethatwood/tonewell/releases/download/v0.2.0/Tonewell_0.2.0_amd64.AppImage"
     },
     "linux-x86_64-deb": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRVzk5WU1wanNMbUEvbzI0anAxclJsTmxTNzVLdHY1OEtOTTZvNUliZnpaUXppMmplUERJT3d6Qk53R25NRmNjSG0xUTlvWTdZVkZCeEdaSmtyMlJkckNWOWxzZWFzZmdRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0OTcyMzQ2CWZpbGU6VG9uZXdlbGxfMC4xLjBfYW1kNjQuZGViCXZlcnNpb246MC4xLjAKRWx1ZEgwVU5wcGNrUFd3SmZuQjBDMndQTGsxV3VKTG5tWGxBRU9CRmtMRlNOTUxsZFFUeU9za05CZStMa1lWMTc5TFUyY2xwMUpUNDVBSkdFOHBlQ3c9PQo=",
-      "url": "https://github.com/sethatwood/tonewell/releases/download/v0.1.0/Tonewell_0.1.0_amd64.deb"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRVzk5WU1wanNMbVB3R2RaRDdJVW8vbGRwY0NWTFNWVnpBTHR3aUtSNnRpMjFKU1lEVjFONW80N2R5aGZrVjJtTTVqRzNqK25jUVJlTFhpN21HOTNCS3d6blFIVFRuclFZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0OTgzOTY3CWZpbGU6VG9uZXdlbGxfMC4yLjBfYW1kNjQuZGViCXZlcnNpb246MC4yLjAKTGZ4ZHNFRWE5ZzE3aHZGSHVRektOWCs3dUZBcjVlVVFPSUVqS3UyWmpYUDZJWU1pYWJYMFdQZG9FY2hUUjBGc2RRZ3JxcTh3ZmxEYUN2YlB6QnJyQXc9PQo=",
+      "url": "https://github.com/sethatwood/tonewell/releases/download/v0.2.0/Tonewell_0.2.0_amd64.deb"
     }
   }
 }
