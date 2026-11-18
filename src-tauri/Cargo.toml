@@ -1,6 +1,6 @@
 [package]
 name = "tonewell"
-version = "0.1.0"
+version = "0.2.0"
 description = "A self-contained music box for meditation and deep focus"
 authors = ["Seth Atwood"]
 license = "MIT"
