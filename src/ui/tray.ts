@@ -18,6 +18,8 @@ export interface TrayOptions {
   update: string | null;
   /** While a glide runs, the beat it's at now (the Beat item says so). */
   beatNow?: number | null;
+  /** The player is shrunk to its light. */
+  mini?: boolean;
 }
 
 const lengthWords = (m: number | null) => (m === null ? 'Open-ended' : `${m} min`);
@@ -74,7 +76,7 @@ export function volumeMenu(s: Snapshot, shortcuts: boolean): MenuNode[] {
   ];
 }
 
-export function trayMenu(session: Session, s: Snapshot, shortcuts: boolean, update: string | null = null, beatNow: number | null = null): MenuNode[] {
+export function trayMenu(session: Session, s: Snapshot, shortcuts: boolean, update: string | null = null, beatNow: number | null = null, mini = false): MenuNode[] {
   const nodes: MenuNode[] = [];
   const hint = (label: string, mac: string) => (shortcuts ? `${label}    ${keys(mac)}` : label);
   if (s.phase === 'ready') {
@@ -99,6 +101,8 @@ export function trayMenu(session: Session, s: Snapshot, shortcuts: boolean, upda
     submenu(`Volume: ${Math.round(s.volume * 100)}%`, volumeMenu(s, shortcuts)),
     sep,
     item('show', 'Show player'),
+    // Also a way back to the full player from anywhere.
+    check('mini', 'Mini player', mini),
     item('visuals', 'Open visuals'),
     item('learn', 'Learn'),
     item('settings', 'Settings…'),
@@ -120,7 +124,7 @@ export function invalidateTray(): void {
 export let trayError: string | null = null;
 
 export async function updateTray(session: Session, s: Snapshot, opts: TrayOptions): Promise<void> {
-  const menu = trayMenu(session, s, opts.shortcuts, opts.update, opts.beatNow ?? null);
+  const menu = trayMenu(session, s, opts.shortcuts, opts.update, opts.beatNow ?? null, opts.mini ?? false);
   const icon = s.phase === 'playing' ? 'playing' : s.phase === 'ready' ? 'ready' : 'resting';
   const title = opts.showTime && s.phase === 'playing' && s.remaining !== null ? `${wholeMinutes(s.remaining)}m` : null;
   const tooltip = s.phase === 'ready' ? 'Tonewell' : `Tonewell: ${s.preset.name}`;

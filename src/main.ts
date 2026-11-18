@@ -129,6 +129,10 @@ function resizeForSheet(sheetHeight: number): Promise<void> {
  * animation, its top-left corner fixed, so the light holds still. Growing
  * runs the same steps backwards. No step changes brightness quickly.
  */
+/** Where mini mode is, or is heading if a shrink or grow is under way. */
+const miniGoal = () => (miniRun ? miniTarget : mini);
+const toggleMini = () => setMini(!miniGoal());
+
 /** Ask for mini mode on or off. Requests made during a transition are kept: the last one wins. */
 function setMini(on: boolean, save = true): Promise<void> {
   miniTarget = on;
@@ -196,7 +200,7 @@ async function showSheet(name: SheetName, arg?: unknown): Promise<void> {
 const actions: PlayerActions = {
   toggleSheet: (name, opener) => sheets.toggle(name, opener),
   openSheet: (name, arg) => void showSheet(name, arg),
-  toggleMini: () => void setMini(!miniTarget),
+  toggleMini: () => void toggleMini(),
   startDrag: () => void currentWindow().then((w) => w?.startDragging()),
   openVisuals: () => void openVisuals(),
   openLearn: (card) => void openLearn(card),
@@ -235,7 +239,7 @@ async function contextMenu(anchor: HTMLElement, at?: { x: number; y: number }): 
   );
   if (!id) return;
   if (id === 'ctx:top') await applySettings({ ...settings, alwaysOnTop: !settings.alwaysOnTop }, true);
-  else if (id === 'ctx:mini') await setMini(!miniTarget);
+  else if (id === 'ctx:mini') await toggleMini();
   else if (id.startsWith('ctx:snap-')) await snapTo(id.slice(9) as 'tl');
   else if (id === 'ctx:guide') await sheets.open('guide', null);
   else if (id === 'ctx:learn') actions.openLearn();
@@ -315,6 +319,9 @@ async function runAction(action: string): Promise<void> {
       return openLearn();
     case 'settings':
       return actions.openSettings();
+    case 'mini':
+      await currentWindow().then((w) => w?.show());
+      return toggleMini();
     case 'check-updates':
       return checkUpdatesNow();
     case 'update-restart':
@@ -416,6 +423,7 @@ function trayOptions(): TrayOptions {
     showTime: settings.showTimeInMenuBar,
     update: update?.state === 'ready' ? update.version : null,
     beatNow: session.phase === 'playing' ? session.beatHzNow() : null,
+    mini: miniGoal(),
   };
 }
 
@@ -554,7 +562,7 @@ addEventListener('keydown', (e) => {
   if (mod && (key === 'ArrowUp' || key === 'ArrowDown')) {
     session.nudgeVolume(key === 'ArrowUp' ? 0.05 : -0.05);
     player.openVolume(false);
-  } else if (mod && key.toLowerCase() === 'm') void setMini(!miniTarget);
+  } else if (mod && key.toLowerCase() === 'm') void toggleMini();
   else if (!mod && (key === '+' || key === '=')) session.wind(5);
   else if (!mod && (key === '-' || key === '_')) session.wind(-5);
   else if (!mod && key === '[') session.stepPreset(-1);
@@ -610,7 +618,9 @@ async function boot(): Promise<void> {
   render();
   if (settings.mini) {
     // The window opens hidden, where the light was left; shrink to it before it shows.
+    // Mini is now where it's meant to be, too, so the next toggle grows it back.
     mini = true;
+    miniTarget = true;
     player.setMini(true);
     app.dataset.mini = 'on';
     await setFrame(MINI.width, MINI.height, 0, 0, false);

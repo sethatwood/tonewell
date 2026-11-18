@@ -14,7 +14,7 @@ function ids(nodes: MenuNode[]): string[] {
   return out;
 }
 
-const KNOWN = /^(go|wind|resume|end|status|show|visuals|learn|settings|quit|check-updates|update-restart|keep-playing|sound-sheet|header:(meditate|focus|yours)|preset-save-as|preset-save|preset-rename|preset-duplicate|preset-delete|preset-revert|mode:(meditate|focus)|preset:.+|length:(\d+|open)|volume:(up|down|\d+)|beat:(off|more|learn|custom|settle|header-(meditate|focus)|[\d.]+))$/;
+const KNOWN = /^(go|wind|resume|end|status|show|mini|visuals|learn|settings|quit|check-updates|update-restart|keep-playing|sound-sheet|header:(meditate|focus|yours)|preset-save-as|preset-save|preset-rename|preset-duplicate|preset-delete|preset-revert|mode:(meditate|focus)|preset:.+|length:(\d+|open)|volume:(up|down|\d+)|beat:(off|more|learn|custom|settle|header-(meditate|focus)|[\d.]+))$/;
 const beatMenu = (s: Snapshot) => beatMenuNodes(s.params, s.mode);
 
 describe('menus', () => {
