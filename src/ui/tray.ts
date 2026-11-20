@@ -7,7 +7,7 @@ import { invoke } from '../platform/bridge';
 import { check, item, sep, submenu, type MenuNode } from './menu';
 import { LENGTHS } from './player';
 import { beatMenuNodes, beatName, fmtHz } from './beats';
-import { keys } from '../platform/os';
+import { isPhone, keys } from '../platform/os';
 
 const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
 
@@ -25,23 +25,41 @@ export interface TrayOptions {
 const lengthWords = (m: number | null) => (m === null ? 'Open-ended' : `${m} min`);
 const wholeMinutes = (seconds: number) => Math.max(1, Math.ceil(seconds / 60 - 1e-6));
 
-/** The disabled first line while a session runs: what is playing, and where it stands. */
-export function trayStatus(s: Snapshot): string {
-  const name = s.preset.name;
-  if (s.paused) return `${name} · paused`;
+/** Where a running session stands, in a few words: "ends 14:17", "winding down". */
+export function statusWords(s: Snapshot): string {
+  if (s.paused) return 'paused';
   const cycling = s.prefs.breakMinutes > 0 && s.prefs.minutes !== null;
   switch (s.phase) {
     case 'playing':
-      if (cycling && s.remaining !== null) return `${name} · block ${s.block}, ${wholeMinutes(s.remaining)} min to break`;
-      return s.endsAt ? `${name} · ends ${timeFmt.format(s.endsAt)}` : `${name} · open-ended`;
+      if (cycling && s.remaining !== null) return `block ${s.block}, ${wholeMinutes(s.remaining)} min to break`;
+      return s.endsAt ? `ends ${timeFmt.format(s.endsAt)}` : 'open-ended';
     case 'winding':
-      return `${name} · winding down`;
+      return 'winding down';
     case 'resting':
-      if (s.inBreak) return s.restLeft !== null ? `${name} · break, ${wholeMinutes(s.restLeft)} min` : `${name} · break`;
-      return `${name} · resting`;
+      if (s.inBreak) return s.restLeft !== null ? `break, ${wholeMinutes(s.restLeft)} min` : 'break';
+      return 'resting';
     default:
-      return `${name} · ending`;
+      return 'ending';
   }
+}
+
+/** The disabled first line while a session runs: what is playing, and where it stands. */
+export function trayStatus(s: Snapshot): string {
+  return `${s.preset.name} · ${statusWords(s)}`;
+}
+
+/**
+ * The stop ladder's next steps from here, as the menu bar and the lock screen
+ * offer them: Wind down then End while playing; Resume (or Start now, on a
+ * break) and End after; only End once the timer is done. Nothing at rest.
+ */
+export function ladder(s: Snapshot): Array<{ id: 'go' | 'wind' | 'resume' | 'end'; label: string }> {
+  const end = { id: 'end', label: 'End' } as const;
+  if (s.phase === 'ready' || s.phase === 'ending') return [];
+  if (s.phase === 'playing') return [{ id: 'wind', label: 'Wind down' }, end];
+  if (s.phase === 'resting' && s.inBreak) return [{ id: 'resume', label: 'Start now' }, end];
+  if (s.phase === 'resting' && s.timerDone && !s.paused) return [end];
+  return [{ id: 'resume', label: 'Resume' }, end];
 }
 
 /** Sound: the mode's sounds, yours, then keeping one and the Sound sheet. */
@@ -83,10 +101,7 @@ export function trayMenu(session: Session, s: Snapshot, shortcuts: boolean, upda
     nodes.push(item('go', hint(`Start ${s.preset.name}, ${lengthWords(s.prefs.minutes).toLowerCase()}`, '⌃⌥⌘Space')));
   } else {
     nodes.push(item('status', trayStatus(s), false));
-    if (s.phase === 'playing') nodes.push(item('wind', hint('Wind down', '⌃⌥⌘Space')), item('end', hint('End', '⌃⌥⌘.')));
-    else if (s.phase === 'resting' && s.inBreak) nodes.push(item('resume', hint('Start now', '⌃⌥⌘Space')), item('end', hint('End', '⌃⌥⌘.')));
-    else if (s.phase === 'resting' && s.timerDone && !s.paused) nodes.push(item('end', hint('End', '⌃⌥⌘.')));
-    else if (s.phase === 'winding' || s.phase === 'resting') nodes.push(item('resume', hint('Resume', '⌃⌥⌘Space')), item('end', hint('End', '⌃⌥⌘.')));
+    for (const c of ladder(s)) nodes.push(item(c.id, hint(c.label, c.id === 'end' ? '⌃⌥⌘.' : '⌃⌥⌘Space')));
   }
   // While a glide runs, the Beat item says where it is now.
   const gliding = beatNow !== null && s.phase === 'playing' && !!s.params.beatOn && Math.abs(beatNow - s.params.beatHz) > 0.05;
@@ -124,6 +139,8 @@ export function invalidateTray(): void {
 export let trayError: string | null = null;
 
 export async function updateTray(session: Session, s: Snapshot, opts: TrayOptions): Promise<void> {
+  // A phone shows the session on its lock screen instead (see platform/phone.ts).
+  if (isPhone) return;
   const menu = trayMenu(session, s, opts.shortcuts, opts.update, opts.beatNow ?? null, opts.mini ?? false);
   const icon = s.phase === 'playing' ? 'playing' : s.phase === 'ready' ? 'ready' : 'resting';
   const title = opts.showTime && s.phase === 'playing' && s.remaining !== null ? `${wholeMinutes(s.remaining)}m` : null;

@@ -9,6 +9,7 @@ import type { SoundParams } from '../audio/params';
 import { bandName } from '../audio/tuning';
 import type { Mode } from '../presets/builtin';
 import { check, item, sep, type MenuNode } from './menu';
+import { Click } from '../platform/os';
 
 export interface BeatChoice {
   id: string;
@@ -84,7 +85,7 @@ export function beatName(p: SoundParams): string {
 
 /** The current beat for the hint line: the beat in bold, then a few words. The chip already shows its name. */
 export function beatHint(p: SoundParams): { b: string; t: string } {
-  if (!p.beatOn) return { b: 'No beat.', t: 'Click to choose one.' };
+  if (!p.beatOn) return { b: 'No beat.', t: `${Click} to choose one.` };
   const c = currentChoice(p);
   if (!c) return { b: p.rampOn ? `${fmtHz(p.rampFrom)} → ${fmtHz(p.beatHz)} Hz,` : `${fmtHz(p.beatHz)} Hz,`, t: 'set by hand.' };
   // A glide says how long it takes, which is a setting of its own.

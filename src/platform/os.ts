@@ -1,11 +1,20 @@
-// Which system Tonewell is running on, for wording: "your Mac" or "your
-// computer", and shortcuts written the way the system writes them.
+// Which system Tonewell is running on, for wording: "your Mac", "your
+// computer" or "your phone", and shortcuts written the way the system writes
+// them.
+
+const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent;
+
+/** A phone (Android for now): one window, touch, the lock screen in place of the menu bar. */
+export const isPhone = /Android|iPhone|iPod/.test(ua);
 
 /** A Mac, or anything that doesn't say otherwise (a browser during development, the tests). */
-export const isMac = typeof navigator === 'undefined' || !/Windows|Linux|X11|CrOS/.test(navigator.userAgent);
+export const isMac = !isPhone && !/Windows|Linux|X11|CrOS/.test(ua);
 
-/** "Mac" or "computer", for sentences about the machine. */
-export const computer = isMac ? 'Mac' : 'computer';
+/** "Click", or "Tap" on a touch screen. */
+export const Click = isPhone ? 'Tap' : 'Click';
+
+/** "Mac", "phone" or "computer", for sentences about the machine. */
+export const computer = isMac ? 'Mac' : isPhone ? 'phone' : 'computer';
 
 /** A shortcut written Mac-style ("⌘M", "⇧⌘V", "⌃⌥⌘Space"), in this system's notation ("Ctrl+M", "Ctrl+Shift+V", "Ctrl+Alt+Win+Space"). */
 export function keys(mac: string): string {

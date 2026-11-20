@@ -110,3 +110,43 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .about-lead { margin: 0 0 12px; font-size: var(--fs-ui); color: var(--ink); line-height: 1.5; }
 .settings p.about-body { margin: 0 0 12px; font-size: var(--fs-ui); color: var(--ink-2); line-height: 1.6; max-width: 60ch; }
 .about-small { margin: 0 0 4px; font-size: var(--fs-small); color: var(--ink-2); }
+
+/* ---------- a phone: full-screen pages over the player ---------- */
+
+html[data-phone] .win-strip {
+  height: calc(56px + var(--inset-top));
+  padding: var(--inset-top) 12px 0 6px;
+  justify-content: flex-start;
+}
+html[data-phone] .win-strip__title { flex: 1; font-size: 17px; color: var(--ink); }
+.win-strip__back {
+  width: 48px; height: 48px; flex: none; display: grid; place-items: center; padding: 0;
+  border: 0; border-radius: 50%; background: transparent; color: var(--ink);
+  -webkit-tap-highlight-color: transparent;
+}
+.win-strip__back .icon { width: 26px; height: 26px; }
+html[data-phone] .size-btn { height: 36px; min-width: 44px; border-radius: 18px; }
+
+html[data-phone] .learn,
+html[data-phone] .settings { inset: calc(56px + var(--inset-top)) 0 0 0; }
+html[data-phone] .learn { display: block; }
+html[data-phone] .learn[data-view='read'] .learn-nav,
+html[data-phone] .learn[data-view='list'] .learn-main { display: none; }
+html[data-phone] .learn-nav { height: 100%; border-right: 0; padding: 0 12px calc(var(--inset-bottom) + 24px); }
+html[data-phone] .learn-intro { margin: 4px 12px 8px; font-size: 14px; }
+html[data-phone] .learn-group { margin: 18px 12px 6px; }
+html[data-phone] .learn-nav li a { padding: 13px 12px; font-size: 16px; }
+html[data-phone] .learn-nav li a[aria-current='page'] { background: transparent; font-weight: inherit; color: var(--ink-2); }
+html[data-phone] .learn-main { height: 100%; padding: 4px 22px calc(var(--inset-bottom) + 40px); }
+html[data-phone] .learn-article { font-size: calc(17px * var(--read-scale)); }
+html[data-phone] .learn-sources li { font-size: calc(14px * var(--read-scale)); }
+
+html[data-phone] .tabs { padding: 0 8px; }
+html[data-phone] .tab { flex: 1; height: 48px; font-size: 15px; }
+html[data-phone] .tab-panel { padding: 8px 22px calc(var(--inset-bottom) + 32px); }
+html[data-phone] .settings .row { padding: 16px 0; }
+html[data-phone] .settings .row__label { font-size: 16px; }
+html[data-phone] .settings .row__help,
+html[data-phone] .settings .foot { font-size: 14px; }
+html[data-phone] .settings .btn { height: 40px; padding: 0 18px; font-size: 15px; }
+html[data-phone] .log-list li { grid-template-columns: 1fr 1fr auto; }

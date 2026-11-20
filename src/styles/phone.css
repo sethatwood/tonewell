@@ -1,0 +1,229 @@
+/* The phone. The player is the whole screen: the light large and centred,
+   what's playing under it, the tools along the bottom. Sheets rise from the
+   bottom over the dimmed player, with the same content as on a computer.
+   Learn, Settings and Visuals open over everything as pages (.route).
+   The app draws edge to edge, under the status and navigation bars: keep
+   clear of them (--inset-top and --inset-bottom, in tokens.css). Only
+   opacity and transform animate, as everywhere. */
+
+html[data-phone] {
+  --ripple: 184px;
+  --ripple-ring-gap: 15px;
+  --chip-h: 40px;
+}
+html[data-phone],
+html[data-phone] body {
+  background: var(--surface);
+}
+
+/* Touch: no hover, no keys to show. */
+html[data-phone] kbd,
+html[data-phone] .kbd {
+  display: none !important;
+}
+html[data-phone] button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---------- the player ---------- */
+
+html[data-phone] .player__ground {
+  border-radius: 0;
+  border: 0;
+}
+html[data-phone] .player__main {
+  flex: 1 1 auto;
+  height: auto;
+  margin: 0;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 40px;
+  padding: calc(var(--inset-top) + 16px) 24px calc(var(--inset-bottom) + 104px);
+  text-align: center;
+}
+html[data-phone] .ripple__core {
+  inset: 28px;
+}
+html[data-phone] .ripple__core .icon {
+  width: 42px;
+  height: 42px;
+}
+html[data-phone] .ripple__num {
+  font-size: 48px;
+}
+html[data-phone] .ripple__unit {
+  font-size: 14px;
+  margin-top: 5px;
+}
+
+html[data-phone] .player__body {
+  flex: none;
+  width: 100%;
+  max-width: 380px;
+  align-items: center;
+  gap: 8px;
+}
+html[data-phone] .player__top {
+  justify-content: center;
+  height: auto;
+}
+html[data-phone] .eyebrow {
+  font-size: 12px;
+}
+html[data-phone] .player__name {
+  max-width: 100%;
+  font-size: 28px;
+  text-align: center;
+}
+/* The hint line keeps the description (two lines here); a press shows a control's hint in it. */
+html[data-phone] .hint {
+  max-width: 34ch;
+  min-height: calc(2 * 1.4em);
+  font-size: 15px;
+  line-height: 1.4;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+html[data-phone] .rest-message {
+  font-size: 16px;
+}
+html[data-phone] .player__actions {
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+html[data-phone] .chip,
+html[data-phone] .player__main .btn {
+  padding: 0 18px;
+  font-size: 15px;
+}
+html[data-phone] .chip .icon {
+  width: 17px;
+  height: 17px;
+}
+html[data-phone] .notice {
+  align-items: center;
+}
+html[data-phone] .notice__actions {
+  justify-content: center;
+}
+html[data-phone] .volume-row {
+  width: 100%;
+  margin-top: 20px;
+}
+
+/* The tools, along the bottom, always there. */
+html[data-phone] .player__tools {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--inset-bottom) + 18px);
+  justify-content: center;
+  gap: 14px;
+  margin: 0;
+  opacity: 1;
+}
+html[data-phone] .player__main .icon-btn {
+  width: 52px;
+  height: 52px;
+  color: var(--ink-2);
+}
+html[data-phone] .player__main .icon-btn .icon {
+  width: 24px;
+  height: 24px;
+}
+
+/* ---------- sheets: from the bottom ---------- */
+
+html[data-phone] .player__sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  max-height: calc(100% - var(--inset-top) - 56px);
+  margin: 0;
+  padding-bottom: var(--inset-bottom);
+  border-radius: 26px 26px 0 0;
+  background-color: var(--surface);
+  box-shadow: 0 0 0 1px var(--line), 0 -16px 48px rgba(0, 0, 0, 0.45);
+  transition: opacity var(--t-sheet) var(--ease-out), transform var(--t-sheet) var(--ease-out);
+}
+html[data-phone] .player__sheet[data-entering] {
+  opacity: 0;
+  transform: translateY(48px);
+  transition: none;
+}
+html[data-phone] .player__sheet[data-leaving] {
+  opacity: 0;
+  transform: translateY(48px);
+  transition: opacity var(--t-ui) var(--ease-ui), transform var(--t-ui) var(--ease-ui);
+}
+/* The sheet is as tall as its content, up to the cap; past that, it scrolls. */
+html[data-phone] .sheet-scroll {
+  flex: 0 1 auto;
+  border-top: 0;
+}
+html[data-phone] .sheet {
+  padding: 22px 22px 22px;
+}
+html[data-phone] .sheet__hint {
+  font-size: 13.5px;
+}
+
+html[data-phone] .sheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  background: rgba(4, 6, 12, 0.6);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-sheet) var(--ease-out);
+}
+html[data-phone] .app[data-sheet]:not([data-sheet='']) .sheet-scrim {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ---------- pages over the player: Learn, Settings, Visuals ---------- */
+
+.route {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--ground);
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--t-sheet) var(--ease-out), transform var(--t-sheet) var(--ease-out);
+}
+.route[data-label='visuals'] {
+  background: #000;
+}
+.route[data-entering],
+.route[data-leaving] {
+  opacity: 0;
+  transform: translateY(32px);
+}
+.route[data-leaving] {
+  transition: opacity var(--t-ui) var(--ease-ui), transform var(--t-ui) var(--ease-ui);
+}
+
+/* The field guide's eyes-closed controls are words, not key caps: one per line. */
+html[data-phone] .keys--words { grid-template-columns: 1fr; gap: 10px; }
+html[data-phone] .keys--words div { justify-content: space-between; font-size: 14px; }
+html[data-phone] .keys--words dt { color: var(--ink); }
+
+/* Pop-up menus (touch and hold one of your sounds): rows a finger can hit. */
+html[data-phone] .pop { z-index: 20; min-width: 220px; }
+html[data-phone] .pop button { min-height: 46px; font-size: 16px; padding: 0 16px; }
+
+/* The field guide's numbers would sit on controls the sheet covers: the list says what each is. */
+html[data-phone] .badges,
+html[data-phone] .guide__n { display: none !important; }

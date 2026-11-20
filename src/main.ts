@@ -1,10 +1,11 @@
 // The mini player window. It owns the sound (the session), mirrors itself
-// into the menu bar, and feeds the optional Visuals window.
+// into the menu bar, and feeds the optional Visuals window. On a phone it is
+// the whole screen, and the lock screen takes the menu bar's place.
 
-import { Session, type Notice, type Phase } from './session/session';
+import { Session, type Notice, type Phase, type Snapshot } from './session/session';
 import { Player, handleMenuId, type PlayerActions } from './ui/player';
 import { SheetHost, sheetBuilders, type SheetName } from './ui/sheets';
-import { invalidateTray, trayError, updateTray, type TrayOptions } from './ui/tray';
+import { invalidateTray, ladder, statusWords, trayError, updateTray, type TrayOptions } from './ui/tray';
 import { check, item, popup, sep, submenu } from './ui/menu';
 import { currentWindow, emitTo, invoke, isTauri, isWindowOpen, listen, openWindow } from './platform/bridge';
 import { flushNow } from './platform/store';
@@ -13,7 +14,9 @@ import {
 } from './platform/updates';
 import { chordRatio } from './visuals/chords';
 import { GLOBAL_SHORTCUTS, loadSettings, patchSettings, type AppSettings } from './settings/model';
-import { keys } from './platform/os';
+import { isPhone, keys } from './platform/os';
+import { routes } from './platform/routes';
+import { onPhone, onPlayback, phoneOutput, showSession, takeBack, type NowPlaying } from './platform/phone';
 
 const session = new Session();
 const app = document.getElementById('app')!;
@@ -102,6 +105,14 @@ async function logicalPosition(): Promise<{ x: number; y: number } | null> {
  * been dragged meanwhile.
  */
 function resizeForSheet(sheetHeight: number): Promise<void> {
+  // A phone's sheet rises over the player: no window to resize. Let the page draw the sheet
+  // where it starts first, so it rises from there (a timer too: a hidden page draws no frames).
+  if (isPhone) {
+    return new Promise((resolve) => {
+      const t = setTimeout(resolve, 50);
+      requestAnimationFrame(() => requestAnimationFrame(() => (clearTimeout(t), resolve())));
+    });
+  }
   const step = async () => {
     if (mini) return;
     const before = await logicalPosition();
@@ -223,7 +234,9 @@ async function openLearn(card?: string): Promise<void> {
 
 async function contextMenu(anchor: HTMLElement, at?: { x: number; y: number }): Promise<void> {
   const id = await popup(
-    [
+    isPhone
+      ? [item('ctx:guide', 'Field guide'), item('ctx:learn', 'Learn'), item('ctx:settings', 'Settings')]
+      : [
       check('ctx:top', 'Always on top', settings.alwaysOnTop),
       submenu('Snap to corner', [item('ctx:snap-tl', 'Top left'), item('ctx:snap-tr', 'Top right'), item('ctx:snap-bl', 'Bottom left'), item('ctx:snap-br', 'Bottom right')]),
       check('ctx:mini', `Mini player    ${keys('⌘M')}`, mini),
@@ -233,7 +246,7 @@ async function contextMenu(anchor: HTMLElement, at?: { x: number; y: number }): 
       item('ctx:settings', `Settings…    ${keys('⌘,')}`),
       sep,
       item('ctx:hide', `Hide window    ${keys('⌘W')}`),
-    ],
+        ],
     anchor,
     at,
   );
@@ -263,10 +276,12 @@ async function applySettings(next: AppSettings, save = false): Promise<void> {
   }
   const w = await currentWindow();
   if (w && prev?.alwaysOnTop !== settings.alwaysOnTop) await w.setAlwaysOnTop(settings.alwaysOnTop);
-  if (isTauri && registeredShortcuts !== settings.shortcutsEnabled) await setShortcuts(settings.shortcutsEnabled);
-  session.setDucked(micBusy && settings.softenForCalls);
-  if (isTauri && prev?.showInDock !== settings.showInDock) void invoke('set_dock_visible', { visible: settings.showInDock }).catch(() => undefined);
-  if (isTauri && prev?.checkUpdates && !settings.checkUpdates) void stopUpdates();
+  if (!isPhone) {
+    if (isTauri && registeredShortcuts !== settings.shortcutsEnabled) await setShortcuts(settings.shortcutsEnabled);
+    session.setDucked(micBusy && settings.softenForCalls);
+    if (isTauri && prev?.showInDock !== settings.showInDock) void invoke('set_dock_visible', { visible: settings.showInDock }).catch(() => undefined);
+    if (isTauri && prev?.checkUpdates && !settings.checkUpdates) void stopUpdates();
+  }
   void updateTray(session, session.snapshot(), trayOptions());
 }
 
@@ -347,13 +362,42 @@ const sheets = new SheetHost(player.sheet, session, sheetBuilders((on) => player
   changed: (name) => {
     player.setSheet(name);
     app.dataset.sheet = name ?? '';
+    syncBack();
   },
   fallbackFocus: () => player.lightButton(),
 });
 app.append(player.el);
 
+// On a phone a sheet rises over the player; a tap beside it closes it.
+if (isPhone) {
+  const scrim = document.createElement('div');
+  scrim.className = 'sheet-scrim';
+  scrim.setAttribute('aria-hidden', 'true');
+  scrim.addEventListener('click', () => void sheets.close());
+  app.append(scrim);
+}
+
+/** The lock screen's view of a session: the sound, where it stands, and the menu bar's controls. */
+function nowPlaying(s: Snapshot): NowPlaying {
+  if (s.phase === 'ready') return { state: 'stopped', title: s.preset.name, controls: [] };
+  const words = statusWords(s);
+  return {
+    state: s.phase === 'playing' && !s.paused ? 'playing' : 'paused',
+    title: s.preset.name,
+    text: s.paused && s.notice ? s.notice.text : words.charAt(0).toUpperCase() + words.slice(1),
+    subtext: s.mode === 'meditate' ? 'Meditate' : 'Focus',
+    controls: ladder(s),
+  };
+}
+
 let mediaKey = '';
-function updateMedia(phase: Phase, title: string): void {
+function updateMedia(s: Snapshot): void {
+  if (onPhone) {
+    void showSession(nowPlaying(s));
+    return;
+  }
+  const phase = s.phase;
+  const title = s.preset.name;
   const state = phase === 'playing' ? 'playing' : phase === 'ready' ? 'stopped' : 'paused';
   const key = `${state}:${title}`;
   if (key === mediaKey) return;
@@ -384,7 +428,7 @@ function setSounding(phase: Phase): void {
 
 function render(): void {
   const s = session.snapshot();
-  updateMedia(s.phase, s.preset.name);
+  updateMedia(s);
   root.dataset.mode = s.mode;
   // Paused by a notice keeps the mode's colours; resting cools to dusk or sand.
   root.dataset.phase = s.paused ? 'paused' : s.phase;
@@ -616,7 +660,7 @@ async function boot(): Promise<void> {
   player.firstRun = !settings.firstRunDone;
   await applySettings(settings);
   render();
-  if (settings.mini) {
+  if (settings.mini && !isPhone) {
     // The window opens hidden, where the light was left; shrink to it before it shows.
     // Mini is now where it's meant to be, too, so the next toggle grows it back.
     mini = true;
@@ -627,31 +671,8 @@ async function boot(): Promise<void> {
   }
 
   if (isTauri) {
-    const out = await invoke<{ name: string; kind: string } | null>('audio_output');
-    if (out) {
-      session.output = out;
-      render();
-    }
-    // Before anything can ask for a check, so no answer is missed.
-    await onUpdateStatus(onUpdate);
-    await listen<string>('tray-action', (id) => {
-      // The system flips a clicked check mark by itself; resend the true state.
-      invalidateTray();
-      void runAction(id).finally(() => void updateTray(session, session.snapshot(), trayOptions()));
-    });
-    await listen('audio-output', (c) => session.onOutputChange(c as Parameters<Session['onOutputChange']>[0]));
-    await listen<boolean>('mic-in-use', (busy) => {
-      micBusy = busy;
-      session.setDucked(busy && settings.softenForCalls);
-    });
-    // The watcher's first report can arrive before this listener existed: ask once now.
-    micBusy = (await invoke<boolean>('mic_in_use')) ?? false;
-    session.setDucked(micBusy && settings.softenForCalls);
-    await listen('quit-requested', async () => {
-      await session.quit();
-      await flushNow();
-      await invoke('quit_now');
-    });
+    if (onPhone) await phoneBoot();
+    else await desktopBoot();
     await listen('settings-changed', async () => {
       const { reloadDoc } = await import('./platform/store');
       await reloadDoc();
@@ -664,7 +685,7 @@ async function boot(): Promise<void> {
       visualsOpen = false;
     });
     await listen<string>('remote-action', (a) => void runAction(a));
-    await startUpdates();
+    if (!isPhone) await startUpdates();
     const w = await currentWindow();
     await w?.show();
     await w?.setFocus();
@@ -675,6 +696,65 @@ async function boot(): Promise<void> {
     });
     await listen<string>('remote-action', (a) => void runAction(a));
   }
+}
+
+/** The menu bar, the output and microphone watchers, and quitting with a fade. */
+async function desktopBoot(): Promise<void> {
+  const out = await invoke<{ name: string; kind: string } | null>('audio_output');
+  if (out) {
+    session.output = out;
+    render();
+  }
+  // Before anything can ask for a check, so no answer is missed.
+  await onUpdateStatus(onUpdate);
+  await listen<string>('tray-action', (id) => {
+    // The system flips a clicked check mark by itself; resend the true state.
+    invalidateTray();
+    void runAction(id).finally(() => void updateTray(session, session.snapshot(), trayOptions()));
+  });
+  await listen('audio-output', (c) => session.onOutputChange(c as Parameters<Session['onOutputChange']>[0]));
+  await listen<boolean>('mic-in-use', (busy) => {
+    micBusy = busy;
+    session.setDucked(busy && settings.softenForCalls);
+  });
+  // The watcher's first report can arrive before this listener existed: ask once now.
+  micBusy = (await invoke<boolean>('mic_in_use')) ?? false;
+  session.setDucked(micBusy && settings.softenForCalls);
+  await listen('quit-requested', async () => {
+    await session.quit();
+    await flushNow();
+    await invoke('quit_now');
+  });
+}
+
+/** The lock screen and headphone buttons, headphones coming and going, calls, and Back. */
+async function phoneBoot(): Promise<void> {
+  const out = await phoneOutput();
+  if (out) {
+    session.output = out;
+    render();
+  }
+  await onPlayback('action', ({ id }) => void runAction(id));
+  await onPlayback('output', (c) => session.onOutputChange(c));
+  await onPlayback('focus', ({ state }) => {
+    if (state === 'transient') session.setDucked(settings.softenForCalls, 'A call or another app is speaking');
+    else if (state === 'gain') session.setDucked(false);
+    else if (state === 'loss') session.interrupt('Another app is playing, so this paused.');
+  });
+  await onPlayback('back', () => void goBack());
+  routes().onChange(syncBack);
+}
+
+/** Back closes the page in front, else steps back out of a sheet. */
+async function goBack(): Promise<void> {
+  const r = routes();
+  if (r.top()) await r.back();
+  else if (sheets.isOpen) sheets.escape();
+}
+
+/** Back belongs to Tonewell only while something is open over the player. */
+function syncBack(): void {
+  if (onPhone) void takeBack(sheets.isOpen || routes().top() !== null);
 }
 
 async function diagnostics(): Promise<void> {

@@ -7,7 +7,7 @@
 import { PARAMS } from '../../audio/params';
 import { moreLikeThis } from '../../presets/nudge';
 import type { Snapshot } from '../../session/session';
-import { keys } from '../../platform/os';
+import { Click, isPhone, keys } from '../../platform/os';
 import { beatName, currentChoice, fmtHz } from '../beats';
 import { h } from '../controls';
 import type { Hint } from '../hint';
@@ -110,7 +110,7 @@ export function shapeSheet(env: SheetEnv): Sheet {
     e.stopPropagation();
     setFeel(w, m);
   });
-  env.hints.add(pad, () => [{ b: 'Feel.' }, { t: 'Arrow keys move the feel point;' }, { k: '0' }, { t: 'recenters.' }]);
+  env.hints.add(pad, () => (isPhone ? [{ b: 'Feel.' }, { t: 'Drag the point: warmer or brighter, stiller or wandering.' }] : [{ b: 'Feel.' }, { t: 'Arrow keys move the feel point;' }, { k: '0' }, { t: 'recenters.' }]));
 
   // ---------- the layers ----------
   const chips = h('div', { class: 'layers' });
@@ -170,7 +170,11 @@ export function shapeSheet(env: SheetEnv): Sheet {
       }
     });
     more.addEventListener('click', () => openPanel(open === l.key ? null : l.key));
-    env.hints.add(toggle, (): Hint => (isOn(l, session.params) ? [{ b: `${l.label},` }, { t: 'in the water. Click to take it out; → for its settings.' }] : [{ b: `${l.label}.` }, { t: 'Click to add it. ⌥-click for all its settings.' }]));
+    env.hints.add(toggle, (): Hint =>
+      isOn(l, session.params)
+        ? [{ b: `${l.label},` }, { t: `in the water. ${Click} to take it out; ${isPhone ? 'the arrow' : '→'} for its settings.` }]
+        : [{ b: `${l.label}.` }, { t: isPhone ? 'Tap to add it.' : 'Click to add it. ⌥-click for all its settings.' }],
+    );
     env.hints.add(more, () => [{ b: `${l.label}:` }, { t: 'its level and most-used settings.' }]);
     chipEls.set(l.key, { wrap, toggle, more });
     return wrap;
@@ -199,10 +203,10 @@ export function shapeSheet(env: SheetEnv): Sheet {
   const el = h(
     'div',
     {},
-    sheetLabel('Feel', 'Double-click to return to center'),
+    sheetLabel('Feel', `Double-${Click.toLowerCase()} to return to center`),
     pad,
     readout,
-    sheetLabel('In the water', 'Click to add or remove'),
+    sheetLabel('In the water', `${Click} to add or remove`),
     chips,
     panelSlot,
     beatRow,
@@ -213,7 +217,7 @@ export function shapeSheet(env: SheetEnv): Sheet {
   return {
     el,
     label: 'Shape the sound',
-    rest: () => [{ t: 'Changes ease in with the sound.' }, { b: 'Revert' }, { t: 'is always one click away.' }],
+    rest: () => [{ t: 'Changes ease in with the sound.' }, { b: 'Revert' }, { t: `is always one ${Click.toLowerCase()} away.` }],
     initialFocus: () => pad,
     dispose: () => measure.disconnect(),
     render(s: Snapshot) {

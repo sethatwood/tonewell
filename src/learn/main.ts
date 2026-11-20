@@ -1,14 +1,16 @@
 // Learn: a reading window. Contents on the left, one card at a time on the
 // right, sources with links you can check. The reading size follows ⌘+, ⌘−
-// and ⌘0 (or A− and A+ at the top right) and is remembered.
+// and ⌘0 (or A− and A+ at the top right) and is remembered. On a phone the
+// two panes take turns: the list, then a card, and Back returns to the list.
 
 import '../styles/pages.css';
 import { CARDS, GROUPS, type Block, type Card } from './content';
 import { h } from '../ui/controls';
 import { uiIcon } from '../ui/icons';
-import { isTauri, listen, openExternal } from '../platform/bridge';
+import { closeWindow, isTauri, listen, openExternal } from '../platform/bridge';
 import { loadSettings, patchSettings } from '../settings/model';
-import { keys } from '../platform/os';
+import { isPhone, keys } from '../platform/os';
+import { onBack } from '../platform/routes';
 
 document.title = 'Learn';
 document.documentElement.dataset.mode = 'meditate';
@@ -45,14 +47,31 @@ for (const g of GROUPS) {
 // The drag strip, with the window's name and the reading size.
 const smaller = h('button', { class: 'size-btn', type: 'button', 'aria-label': 'Smaller text', title: `Smaller text (${keys('⌘−')})` }, 'A', uiIcon('minus'));
 const larger = h('button', { class: 'size-btn size-btn--large', type: 'button', 'aria-label': 'Larger text', title: `Larger text (${keys('⌘+')})` }, 'A', uiIcon('plus'));
+// On a phone, a way back: to the list from a card, out of Learn from the list.
+const back = isPhone ? h('button', { class: 'win-strip__back', type: 'button', 'aria-label': 'Back' }, uiIcon('chevron-left')) : null;
 const strip = h(
   'header',
   { class: 'win-strip', 'data-tauri-drag-region': '' },
+  back,
   h('span', { class: 'win-strip__title', 'data-tauri-drag-region': '' }, 'Learn'),
   h('span', { class: 'win-strip__tools', role: 'group', 'aria-label': 'Text size' }, smaller, larger),
 );
 const main = h('main', { class: 'learn-main' }, article);
-document.body.append(strip, h('div', { class: 'learn' }, nav, main));
+const learn = h('div', { class: 'learn', 'data-view': 'read' }, nav, main);
+document.body.append(strip, learn);
+
+/** The phone's list of topics, in place of a card. Returns false if it was showing already. */
+function showList(): boolean {
+  if (!isPhone || learn.dataset.view === 'list') return false;
+  learn.dataset.view = 'list';
+  history.replaceState(null, '', location.pathname);
+  nav.scrollTo({ top: 0 });
+  return true;
+}
+back?.addEventListener('click', () => {
+  if (!showList()) void closeWindow();
+});
+onBack(showList);
 
 let scale = 1;
 function setScale(next: number, save = true): void {
@@ -141,11 +160,16 @@ function show(id: string, focus = false): void {
     ...(next ? [next] : []),
   );
   main.scrollTo({ top: 0 });
+  learn.dataset.view = 'read';
   if (focus) article.focus({ preventScroll: true });
 }
 
-addEventListener('hashchange', () => show(location.hash.slice(1), true));
+addEventListener('hashchange', () => {
+  if (location.hash) show(location.hash.slice(1), true);
+});
 show(location.hash.slice(1) || CARDS[0].id);
+// A phone opens on the list, unless a particular card was asked for.
+if (isPhone && !location.hash) showList();
 void loadSettings().then((s) => setScale(s.learnScale ?? 1, false));
 void listen<string>('learn-open', (id) => {
   location.hash = id;

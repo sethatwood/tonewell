@@ -1,0 +1,5 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Keep playing with the screen locked, show the session on the lock screen, keep the screen on when asked, let Back close a sheet, and hear about headphones, calls and other apps' sound."
+permissions = ["allow-update", "allow-output", "allow-keep-screen-on", "allow-handle-back", "allow-register-listener", "allow-remove-listener"]

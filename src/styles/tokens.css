@@ -219,3 +219,9 @@
   --r-button: 12px;
   --r-pop: 16px;
 }
+
+/* A phone draws edge to edge, under its status and navigation bars: what to keep clear of. */
+html[data-phone] {
+  --inset-top: max(env(safe-area-inset-top, 0px), 28px);
+  --inset-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
+}

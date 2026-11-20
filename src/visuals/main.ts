@@ -8,17 +8,19 @@
 //   faster than 3 Hz;
 // - a global brightness cap, lower again in Calm visuals;
 // - no beat-synced pulsing: the beat frequency is never fed to the picture;
-// - Esc fades to dark at once (over about a second, never a cut).
+// - Esc fades to dark at once (over about a second, never a cut). On a
+//   phone, Back does: then Back again closes, and a tap brings the light back.
 
 import '../styles/visuals.css';
 import { EMBER, PALETTES, SCENES } from './shader';
 import { Visuals } from './renderer';
 import { SoundFollower } from './follow';
-import { emitTo, listen, currentWindow, isTauri } from '../platform/bridge';
+import { emitTo, listen, currentWindow, isTauri, closeWindow as closePage } from '../platform/bridge';
 import { loadSettings, patchSettings, type AppSettings } from '../settings/model';
 import { h } from '../ui/controls';
 import { uiIcon, type UiIcon } from '../ui/icons';
-import { computer } from '../platform/os';
+import { computer, isPhone } from '../platform/os';
+import { onBack } from '../platform/routes';
 
 interface Frame {
   /** The drone's chord as a small whole-number ratio, for the Harmonograph. */
@@ -39,7 +41,11 @@ document.title = 'Tonewell Visuals';
 
 const canvas = h('canvas', { 'aria-hidden': 'true' });
 document.body.append(canvas);
-const darkHint = h('p', { class: 'dark-hint vis-ui' }, 'Dark. Esc again closes the window; any other key brings the light back.');
+const darkHint = h(
+  'p',
+  { class: 'dark-hint vis-ui' },
+  isPhone ? 'Dark. Back again closes the visuals; a tap brings the light back.' : 'Dark. Esc again closes the window; any other key brings the light back.',
+);
 document.body.append(darkHint);
 
 const vis = Visuals.create(canvas);
@@ -135,9 +141,7 @@ async function toggleFullscreen(): Promise<void> {
 
 async function closeWindow(): Promise<void> {
   void emitTo('main', 'visuals-bye');
-  const w = await currentWindow();
-  if (w) await w.close();
-  else window.close();
+  await closePage();
 }
 
 function iconButton(icon: UiIcon, label: string, onClick: () => void, extra: Record<string, string> = {}): HTMLButtonElement {
@@ -277,7 +281,8 @@ function buildBar(): HTMLElement {
     drift,
     pacerBtn,
     lightBtn,
-    fs,
+    // A phone's page already fills the screen.
+    isPhone ? null : fs,
     h('span', { class: 'vis-bar__sep', 'aria-hidden': 'true' }),
     close,
   );
@@ -296,7 +301,7 @@ function firstOpenNote(): Promise<boolean> {
         { class: 'dialog', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'note-title' },
         h('h1', { id: 'note-title' }, 'Before the lights come up'),
         h('p', {}, 'The visuals fill the screen with slow, shifting color. Brightness never changes faster than three times a second, and Calm visuals keeps it dimmer still.'),
-        h('p', {}, 'If you have photosensitive epilepsy, or patterns of light have ever made you unwell, talk to your doctor before using them. If anything feels wrong, press Esc and the screen fades to dark at once.'),
+        h('p', {}, `If you have photosensitive epilepsy, or patterns of light have ever made you unwell, talk to your doctor before using them. If anything feels wrong, press ${isPhone ? 'Back' : 'Esc'} and the screen fades to dark at once.`),
         h('label', { class: 'check', for: 'calm' }, calm, h('span', {}, 'Calm visuals (you can change this in the Light panel)')),
         h('div', { class: 'dialog__actions' }, notNow, show),
       ),
@@ -310,6 +315,21 @@ function firstOpenNote(): Promise<boolean> {
       resolve(true);
     });
     notNow.addEventListener('click', () => resolve(false));
+  });
+}
+
+// A phone's Back is Esc: dark first, then closed.
+onBack(() => {
+  if (state.dark || document.querySelector('.note')) return false;
+  state.dark = true;
+  document.body.classList.add('dark');
+  return true;
+});
+if (isPhone) {
+  addEventListener('pointerdown', () => {
+    if (!state.dark) return;
+    state.dark = false;
+    document.body.classList.remove('dark');
   });
 }
 

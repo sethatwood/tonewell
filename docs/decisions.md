@@ -393,3 +393,44 @@ and A+ beside the window's name, and is remembered.
 looking at when you want to change it. The reading size came from use:
 Learn's text was too small on a large display.
 
+
+## 24. On a phone, the same app in one window
+
+**Decision.** The Android app is this app: the same Tauri shell and the
+same web page making the sound, with a phone layout and a small native
+plugin (`src-tauri/plugins/playback`). On a phone:
+
+- The player is the whole screen: the light large and centred, the tools
+  (Shape, Visuals, Field guide, Learn, Settings) along the bottom. There
+  is no mini player.
+- Sheets rise from the bottom over the dimmed player, with the same
+  content as on a computer; a tap beside one, or Back, closes it.
+- Learn, Settings and Visuals open over everything as full-screen pages,
+  each in a frame inside the one window, so the page making the sound
+  never navigates away. They talk to the player over the same local
+  channel the browser build uses, and reach the app (storage, links)
+  through the player's page: Android answers every call there. Learn
+  becomes a list, then a card; Back returns to the list.
+- The lock screen takes the menu bar's place. While a session runs, a
+  media-playback foreground service keeps the process alive with the
+  screen off and shows the session in the notification and on the lock
+  screen, in the menu bar's words, with its ladder: the system's pause
+  winds down, play resumes, a square ends. Headphone buttons do the same.
+- A call, or another app speaking briefly, softens the sound (when
+  "Soften during calls" is on); another app starting to play pauses it
+  quietly, waiting for Resume or End, as unplugging headphones does.
+  Headphones coming out are reported the moment Android announces it.
+- Hints stop at the first key (there are none), mouse words become
+  touch words, and Meditate doesn't keep the screen on by default.
+- No tray, global shortcuts, login item, window state or self-updates:
+  the store brings updates.
+
+**Why.** The deciding question was whether the web audio engine keeps
+playing with the screen locked. On Android 17 (an emulated Pixel), with
+the foreground service started from the front as Android now requires,
+it did: the audio clock kept exact time, bells kept being scheduled and
+the system mixer kept its track active, with the page hidden. So the
+sound stays in one engine on every platform. The plugin also undoes the
+webview's own pause when the activity pauses, while a session runs.
+iPhones are a separate question (WebKit has open bugs about web audio
+after a lock) and may still need a native engine.

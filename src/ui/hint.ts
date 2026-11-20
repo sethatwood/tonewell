@@ -4,16 +4,24 @@
 // the control.
 
 import { h } from './controls';
+import { isPhone } from '../platform/os';
 
 /** One hint: bold words, plain words and key caps, in order. */
 type Part = { b: string } | { t: string } | { k: string };
 export type Hint = Part[];
 
-export const plain = (hint: Hint): string => hint.map((p) => ('b' in p ? p.b : 't' in p ? p.t : p.k)).join(' ');
+/** On a touch screen there are no keys: a hint ends where its first key would be ("No beat. Just the sound."). */
+const forScreen = (hint: Hint): Hint => {
+  if (!isPhone) return hint;
+  const i = hint.findIndex((p) => 'k' in p);
+  return i < 0 ? hint : hint.slice(0, i);
+};
+
+export const plain = (hint: Hint): string => forScreen(hint).map((p) => ('b' in p ? p.b : 't' in p ? p.t : p.k)).join(' ');
 
 /** The hint's words as nodes: bold in <b>, keys in <kbd>. */
 export function hintNodes(hint: Hint): Array<Node | string> {
-  return hint.flatMap((p, i) => {
+  return forScreen(hint).flatMap((p, i) => {
     const sp = i ? [' '] : [];
     if ('b' in p) return [...sp, h('b', {}, p.b)];
     if ('k' in p) return [...sp, h('kbd', {}, p.k)];

@@ -172,7 +172,7 @@ pub async fn update_restart(app: AppHandle) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || install(&handle, true))
         .await
         .map_err(|e| e.to_string())??;
-    crate::QUITTING.store(true, std::sync::atomic::Ordering::SeqCst);
+    crate::desktop::QUITTING.store(true, std::sync::atomic::Ordering::SeqCst);
     app.restart();
 }
 

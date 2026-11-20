@@ -9,6 +9,7 @@ import { uiIcon } from '../icons';
 import { SHAPING_LAYERS, SOUND_LAYERS, isOn, type LayerInfo } from '../layers';
 import type { Sheet, SheetEnv } from './host';
 import { learnLink, paramChoice, paramField, paramSwitch, sheetHead, switchRow, type Part } from './parts';
+import { Click, isPhone } from '../../platform/os';
 
 const LEARN_WORDS: Partial<Record<ParamId, string>> = { a432: 'Why?', voicesOn: 'What is this?', noiseColor: 'Which color?' };
 const learnFor = (env: SheetEnv, id: ParamId) => {
@@ -70,7 +71,7 @@ export function allSettingsSheet(env: SheetEnv, arg: unknown): Sheet {
       if (open) for (const p of parts) p.refresh(session.snapshot());
       if (open) queueMicrotask(() => el.scrollIntoView({ block: 'nearest' }));
     });
-    env.hints.add(head, () => [{ b: `${l.label}.` }, { t: `${count} setting${count === 1 ? '' : 's'}. Click to ${open === l.key ? 'fold them away' : 'show them'}.` }]);
+    env.hints.add(head, () => [{ b: `${l.label}.` }, { t: `${count} setting${count === 1 ? '' : 's'}. ${Click} to ${open === l.key ? 'fold them away' : 'show them'}.` }]);
     return { layer: l, el, head, state, body, parts };
   });
 
@@ -90,7 +91,7 @@ export function allSettingsSheet(env: SheetEnv, arg: unknown): Sheet {
     el,
     label: 'All settings',
     parent: 'shape',
-    rest: () => [{ t: 'Hover a setting for what it does. Everything here eases in with the sound.' }],
+    rest: () => [{ t: `${isPhone ? 'Touch' : 'Hover'} a setting for what it does. Everything here eases in with the sound.` }],
     initialFocus: () => sections.find((s) => s.layer.key === open)?.head ?? null,
     render(s: Snapshot) {
       for (const sec of sections) {

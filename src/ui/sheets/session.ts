@@ -6,6 +6,7 @@ import { h } from '../controls';
 import { check } from '../menu';
 import type { Sheet, SheetEnv } from './host';
 import { menuRow, segmented, sheetHead, switchRow, type Part } from './parts';
+import { isPhone } from '../../platform/os';
 
 const LENGTHS = [10, 15, 20, 30, 45, 60, 90, 0];
 const CYCLES: Array<{ id: string; label: string; minutes: number; rest: number }> = [
@@ -87,7 +88,9 @@ export function sessionSheet(env: SheetEnv): Sheet {
       const m = s.prefs.minutes;
       const listed = LENGTHS.includes(m ?? 0);
       length.set(listed ? (m ?? 0) : null);
-      helper.textContent = listed ? 'Minutes. + and − change it by 5 from anywhere in the player.' : `Now ${m} minutes. + and − change it by 5 from anywhere in the player.`;
+      // A phone has no + and − keys.
+      const keysNote = isPhone ? '' : ' + and − change it by 5 from anywhere in the player.';
+      helper.textContent = listed ? `Minutes.${keysNote}` : `Now ${m} minutes.${keysNote}`;
       cycles.el.hidden = s.mode !== 'focus';
       cycles.refresh(s);
       for (const r of rows) r.refresh(s);

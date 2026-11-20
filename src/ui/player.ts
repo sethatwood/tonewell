@@ -16,7 +16,7 @@ import { BEAT_CHOICES, beatHint, beatLong, beatName, choiceParams } from './beat
 import { HintLine, type Hint } from './hint';
 import { sheetIs, type NameRequest, type SheetName } from './sheets/host';
 // Windows writes shortcuts longer (Ctrl+Shift+V), so a few hints say less there to fit the line.
-import { isMac, keys } from '../platform/os';
+import { isMac, isPhone, keys } from '../platform/os';
 
 export type { Hint } from './hint';
 
@@ -315,9 +315,15 @@ export class Player {
     this.helpBtn = this.tool('help', 'Field guide', () => actions.toggleSheet('guide', this.helpBtn), () => [{ b: 'Field guide.' }, { t: 'What everything does.' }, { k: '?' }]);
     this.helpBtn.setAttribute('aria-expanded', 'false');
     this.helpBtn.setAttribute('aria-keyshortcuts', '?');
-    const miniBtn = this.tool('mini', 'Shrink to the light', () => actions.toggleMini(), () => [{ b: isMac ? 'Mini player:' : 'Mini:' }, { t: 'just the light.' }, { k: keys('⌘M') }]);
-    miniBtn.setAttribute('aria-keyshortcuts', 'Meta+M');
-    const tools = h('div', { class: 'player__tools' }, this.shapeBtn, visualsBtn, this.helpBtn, miniBtn);
+    // A phone has no mini player, and no menu bar to reach Learn and Settings from.
+    const more = isPhone
+      ? [
+          this.tool('learn', 'Learn', () => actions.openLearn(), () => [{ b: 'Learn:' }, { t: 'what the sounds and beats are, with sources.' }]),
+          this.tool('settings', 'Settings', () => actions.openSettings(), () => [{ b: 'Settings.' }]),
+        ]
+      : [this.tool('mini', 'Shrink to the light', () => actions.toggleMini(), () => [{ b: isMac ? 'Mini player:' : 'Mini:' }, { t: 'just the light.' }, { k: keys('⌘M') }])];
+    if (!isPhone) more[0].setAttribute('aria-keyshortcuts', 'Meta+M');
+    const tools = h('div', { class: 'player__tools' }, this.shapeBtn, visualsBtn, this.helpBtn, ...more);
     const top = h('div', { class: 'player__top', 'data-tauri-drag-region': true }, this.eyebrowBtn, this.eyebrowText, tools);
 
     // What is playing, and the hint line
@@ -352,7 +358,7 @@ export class Player {
   // ---------- building blocks ----------
 
   private tool(icon: UiIcon, label: string, onClick: () => void, hint: () => Hint): HTMLButtonElement {
-    const b = h('button', { class: 'icon-btn', type: 'button', 'aria-label': label }, uiIcon(icon));
+    const b = h('button', { class: 'icon-btn', type: 'button', 'aria-label': label, 'data-tool': icon }, uiIcon(icon));
     b.addEventListener('click', onClick);
     this.hints.add(b, hint);
     return b;

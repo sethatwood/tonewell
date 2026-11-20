@@ -6,8 +6,26 @@
 // windows can never overwrite each other's newer data.
 
 import { isTauri } from './bridge';
+import { isPhone } from './os';
 
 type Doc = Record<string, unknown>;
+
+interface DocApi {
+  loadDoc(): Promise<Doc>;
+  reloadDoc(): Promise<Doc>;
+  patchDoc(patch: Doc, immediate?: boolean): Promise<void>;
+  flushNow(): Promise<void>;
+}
+
+/** A page inside the phone's one window keeps no copy of its own: it reads and writes the top page's. */
+const shared: DocApi | null = (() => {
+  if (!isPhone || typeof window === 'undefined' || window.parent === window) return null;
+  try {
+    return ((window.top as unknown as Record<string, unknown>).__tonewellDoc as DocApi | undefined) ?? null;
+  } catch {
+    return null;
+  }
+})();
 
 const LOCAL_PREFIX = 'tonewell:';
 
@@ -21,6 +39,7 @@ async function tauriStore() {
 }
 
 export async function loadDoc(): Promise<Doc> {
+  if (shared) return shared.loadDoc();
   if (cache) return cache;
   const doc: Doc = {};
   try {
@@ -60,6 +79,7 @@ export async function loadDoc(): Promise<Doc> {
 
 /** Re-read everything (another window changed something). Unsaved local changes are kept. */
 export async function reloadDoc(): Promise<Doc> {
+  if (shared) return shared.reloadDoc();
   const pending: Doc = {};
   if (cache) for (const k of dirty) pending[k] = cache[k];
   cache = null;
@@ -94,6 +114,7 @@ async function flush(): Promise<void> {
 
 /** Update some keys and save them shortly after (debounced), or at once. */
 export async function patchDoc(patch: Doc, immediate = false): Promise<void> {
+  if (shared) return shared.patchDoc(patch, immediate);
   const doc = await loadDoc();
   for (const [k, v] of Object.entries(patch)) {
     doc[k] = v;
@@ -105,6 +126,12 @@ export async function patchDoc(patch: Doc, immediate = false): Promise<void> {
 }
 
 export async function flushNow(): Promise<void> {
+  if (shared) return shared.flushNow();
   if (saveTimer) clearTimeout(saveTimer);
   await flush();
+}
+
+// The phone's top page lends its copy to the pages opened inside it.
+if (isPhone && typeof window !== 'undefined' && window.parent === window) {
+  Object.assign(window, { __tonewellDoc: { loadDoc, reloadDoc, patchDoc, flushNow } satisfies DocApi });
 }

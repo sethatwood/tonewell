@@ -16,16 +16,23 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api"] }
 tauri-plugin-store = "2"
-tauri-plugin-window-state = "2"
-tauri-plugin-global-shortcut = "2"
-tauri-plugin-autostart = "2"
 tauri-plugin-opener = "2"
-tauri-plugin-single-instance = "2"
-tauri-plugin-updater = "2"
-keepawake = "0.6"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 log = "0.4"
+
+# The desktop shell: menu bar, windows, shortcuts, login item, updates.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-window-state = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2"
+keepawake = "0.6"
+
+# Phones: background playback, lock-screen controls, audio focus and outputs.
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+tauri-plugin-playback = { path = "plugins/playback" }
 
 [profile.release]
 codegen-units = 1

@@ -1,0 +1,15 @@
+[package]
+name = "tauri-plugin-playback"
+version = "0.1.0"
+description = "Tonewell on a phone: playback with the screen locked, lock-screen controls, audio focus and outputs"
+authors = ["Seth Atwood"]
+license = "MIT"
+edition = "2024"
+publish = false
+links = "tauri-plugin-playback"
+
+[dependencies]
+tauri = "2"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }

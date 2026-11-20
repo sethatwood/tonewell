@@ -1,14 +1,17 @@
 // Settings (⌘,): how the app behaves. Nothing about the sound lives here (the
 // player's sheets have that), and the visuals' settings live in the visuals
-// window's Light panel. Four tabs: General, Shortcuts, Sessions, About.
+// window's Light panel. Four tabs: General, Shortcuts, Sessions, About. A
+// phone has no menu bar, Dock, login item, shortcuts or self-updates, so
+// there it is General (calls), Sessions and About.
 
 import '../styles/pages.css';
 import { GLOBAL_SHORTCUTS, clearLog, loadLog, loadSettings, patchSettings, type AppSettings, type LogEntry } from './model';
 import { h, switchControl } from '../ui/controls';
-import { emit, isTauri, listen, openExternal } from '../platform/bridge';
+import { closeWindow, emit, invoke, isTauri, listen, openExternal } from '../platform/bridge';
 import { reloadDoc } from '../platform/store';
 import { checkForUpdate, onUpdateStatus, updateStatus, type UpdateStatus } from '../platform/updates';
-import { computer, isMac, keys } from '../platform/os';
+import { computer, isMac, isPhone, keys } from '../platform/os';
+import { uiIcon } from '../ui/icons';
 
 document.title = 'Tonewell Settings';
 document.documentElement.dataset.mode = 'meditate';
@@ -19,7 +22,7 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'shortcuts', label: 'Shortcuts' },
   { id: 'sessions', label: 'Sessions' },
   { id: 'about', label: 'About' },
-];
+].filter((t) => !isPhone || t.id !== 'shortcuts') as Array<{ id: Tab; label: string }>;
 let tab: Tab = 'general';
 
 /** Repaints the update line; replaced each time the page is rebuilt. */
@@ -51,9 +54,7 @@ async function autostart() {
 }
 
 async function appVersion(): Promise<string> {
-  if (!isTauri) return '';
-  const { getVersion } = await import('@tauri-apps/api/app');
-  return getVersion().catch(() => '');
+  return (await invoke<string>('plugin:app|version').catch(() => undefined)) ?? '';
 }
 
 const row = (label: string, help: string | null, control: HTMLElement) =>
@@ -78,8 +79,15 @@ async function boot(): Promise<void> {
     if (on) await a.enable();
     else await a.disable();
   }, true);
-  void autostart().then(async (a) => login.set(a ? await a.isEnabled() : false));
-  const general = h(
+  if (!isPhone) void autostart().then(async (a) => login.set(a ? await a.isEnabled() : false));
+  const general = isPhone
+    ? h(
+        'div',
+        {},
+        row('Soften during calls', 'While a call is on, or another app speaks for a moment (directions, a voice message), the sound gets noticeably quieter, then comes back.', soften.el),
+        h('p', { class: 'foot' }, 'Visuals settings, including the brightness limit, live in the visuals’ Light panel.'),
+      )
+    : h(
     'div',
     {},
     row('Keep the player on top', 'Floats above other windows. Right-click the player to snap it to a corner.', top.el),
@@ -166,7 +174,7 @@ async function boot(): Promise<void> {
     updateLine.textContent = updateText(u);
     checkNow.disabled = u.state === 'checking' || u.state === 'downloading' || u.state === 'ready';
   };
-  void updateStatus().then((u) => u && paintUpdate(u));
+  if (!isPhone) void updateStatus().then((u) => u && paintUpdate(u));
   const repo = h('a', { href: 'https://github.com/sethatwood/tonewell' }, 'Source code');
   repo.addEventListener('click', (e) => {
     e.preventDefault();
@@ -180,17 +188,24 @@ async function boot(): Promise<void> {
     h(
       'p',
       { class: 'about-body' },
-      `There are no accounts and no analytics. Your settings, sounds and session log stay in one file on this ${computer}. The only things that reach the internet are the daily update check, which sends nothing about you, and Learn’s sources, which open in your browser.`,
+      isPhone
+        ? `There are no accounts and no analytics. Your settings, sounds and session log stay in one file on this ${computer}. The only thing that reaches the internet is Learn’s sources, which open in your browser.`
+        : `There are no accounts and no analytics. Your settings, sounds and session log stay in one file on this ${computer}. The only things that reach the internet are the daily update check, which sends nothing about you, and Learn’s sources, which open in your browser.`,
     ),
     h('p', { class: 'about-small' }, 'MIT license. ', repo),
     h('p', { class: 'about-small' }, 'Type: Figtree, by Erik Kennedy, SIL Open Font License.'),
-    row(
-      'Check for updates',
-      'Once a day, Tonewell asks tonewell.space whether there’s a new version. If there is, it downloads it from GitHub and installs it when you quit or restart, never during a session. Turning this off also drops an update that’s waiting.',
-      updates.el,
-    ),
-    updateLine,
-    h('div', { class: 'confirm' }, checkNow),
+    // A phone's app store brings updates.
+    ...(isPhone
+      ? []
+      : [
+          row(
+            'Check for updates',
+            'Once a day, Tonewell asks tonewell.space whether there’s a new version. If there is, it downloads it from GitHub and installs it when you quit or restart, never during a session. Turning this off also drops an update that’s waiting.',
+            updates.el,
+          ),
+          updateLine,
+          h('div', { class: 'confirm' }, checkNow),
+        ]),
   );
 
   // ---------- the tabs ----------
@@ -218,8 +233,10 @@ async function boot(): Promise<void> {
   });
   select(tab);
 
+  const back = isPhone ? h('button', { class: 'win-strip__back', type: 'button', 'aria-label': 'Back' }, uiIcon('chevron-left')) : null;
+  back?.addEventListener('click', () => void closeWindow());
   document.body.append(
-    h('header', { class: 'win-strip', 'data-tauri-drag-region': '' }, h('span', { class: 'win-strip__title', 'data-tauri-drag-region': '' }, 'Settings')),
+    h('header', { class: 'win-strip', 'data-tauri-drag-region': '' }, back, h('span', { class: 'win-strip__title', 'data-tauri-drag-region': '' }, 'Settings')),
     h('main', { class: 'settings' }, tablist, panel),
   );
 }
@@ -242,5 +259,5 @@ async function rebuild(): Promise<void> {
 
 void boot().then(async () => {
   await listen('settings-changed', () => void rebuild());
-  await onUpdateStatus((u) => paintUpdate(u));
+  if (!isPhone) await onUpdateStatus((u) => paintUpdate(u));
 });

@@ -139,6 +139,19 @@ npm run screenshots     # regenerates the screenshots above
 [docs/listening.md](docs/listening.md) says what to listen for when checking
 the sound by ear.
 
+Android is under way. With the Android SDK, the NDK and a JDK installed
+(and `ANDROID_HOME`, `NDK_HOME` and `JAVA_HOME` set), plus the Rust Android
+targets (`rustup target add aarch64-linux-android`):
+
+```sh
+npm run tauri android build -- --debug --apk --target aarch64
+adb install -r src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
+```
+
+On a phone the player fills the screen, sheets rise from the bottom, and a
+session shows on the lock screen, where it keeps playing with the screen off
+([decision 24](docs/decisions.md)).
+
 macOS is the main target, on Apple silicon and Intel. Windows has its own
 output watcher, so pulling headphones out pauses the sound there too; it is
 built by CI but has barely been tried. Linux builds and should play, without
@@ -160,7 +173,10 @@ checks.
   `src/visuals/renderer.ts` holds the visuals' brightness limits for
   both the app and the website.
 - `src-tauri` is the native shell: menu bar, keep-awake, output watching,
-  window lifecycle.
+  window lifecycle (`src-tauri/src/desktop.rs`). On a phone,
+  `src-tauri/plugins/playback` keeps a session playing with the screen
+  locked and puts it on the lock screen; `src-tauri/gen/android` is the
+  Android project.
 - `site` is [tonewell.space](https://tonewell.space): static files,
   deployed when `main` is pushed. Its script, for the "Hear a taste"
   button and the live visuals panel, is built from the app's own engine

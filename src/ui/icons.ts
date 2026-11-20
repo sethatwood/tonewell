@@ -21,7 +21,8 @@ export const UI_ICONS = {
   'wind-down': '<path d="M4 8c3 0 4.5 4 8 4s5 4 8 4"/>',
   close: '<path d="M7 7l10 10M17 7 7 17"/>',
   learn: '<path d="M12 6.5C10 5 7.5 4.5 4 4.8v13c3.5-.3 6 .2 8 1.7 2-1.5 4.5-2 8-1.7v-13c-3.5-.3-6 .2-8 1.7z"/><path d="M12 6.5v13"/>',
-  settings: '<circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6 6l1.6 1.6M16.4 16.4 18 18M6 18l1.6-1.6M16.4 7.6 18 6"/>',
+  // Two sliders: unlike the visuals' sun, which sits beside it on a phone.
+  settings: '<path d="M4.5 8h8M16.5 8h3M4.5 16h3M11.5 16h8"/><circle cx="14.5" cy="8" r="2"/><circle cx="9.5" cy="16" r="2"/>',
   plus: '<path d="M12 6v12M6 12h12"/>',
   minus: '<path d="M6 12h12"/>',
   'chevron-up': '<path d="M7 14l5-5 5 5"/>',

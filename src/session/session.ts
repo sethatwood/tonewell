@@ -15,9 +15,9 @@ import { WebAudioEngine, type Plan } from '../audio/engine';
 import { PARAMS, clampParam, defaultParams, mergeParams, type ParamId, type SoundParams } from '../audio/params';
 import { BUILTIN_PRESETS, presetParams, type Mode, type Preset } from '../presets/builtin';
 import { loadDoc, patchDoc } from '../platform/store';
-import { invoke } from '../platform/bridge';
+import { keepAwake } from '../platform/bridge';
 import { appendLog } from '../settings/model';
-import { computer } from '../platform/os';
+import { computer, isPhone } from '../platform/os';
 
 export type { Mode } from '../presets/builtin';
 export type Phase = 'ready' | 'playing' | 'winding' | 'resting' | 'ending';
@@ -40,7 +40,8 @@ export interface SessionPrefs {
 export const PREFS_DEFAULT: Record<Mode, SessionPrefs> = {
   meditate: {
     minutes: 20, fadeIn: 10, landTo: 'hum', restMinutes: 2, endBell: true, startBell: false,
-    keepPlaying: false, keepScreenAwake: true, breakMinutes: 0,
+    // A phone's screen can go dark during a sit: the sound plays on.
+    keepPlaying: false, keepScreenAwake: !isPhone, breakMinutes: 0,
   },
   focus: {
     minutes: null, fadeIn: 6, landTo: 'silence', restMinutes: 0, endBell: true, startBell: false,
@@ -355,11 +356,11 @@ export class Session extends EventTarget {
   private ducked = false;
 
   /** Soften (about −9 dB) while a call is on, and come back up afterwards. */
-  setDucked(on: boolean): void {
+  setDucked(on: boolean, why = 'A microphone is in use'): void {
     if (on === this.ducked) return;
     this.ducked = on;
     this.engine?.setVolume(this.effectiveVolume());
-    if (on && this.isRunning()) this.setNotice({ kind: 'softer', text: 'A microphone is in use, so the sound is softer.', ttl: 6 });
+    if (on && this.isRunning()) this.setNotice({ kind: 'softer', text: `${why}, so the sound is softer.`, ttl: 6 });
     this.emit();
   }
 
@@ -737,6 +738,11 @@ export class Session extends EventTarget {
     }
   }
 
+  /** Another app took over the sound for good: go quiet and wait for Resume or End, as unplugging does. */
+  interrupt(message: string): void {
+    if (this.engine && this.phase !== 'ready' && this.phase !== 'ending' && !this.pausedForDevice) this.pauseQuietly('interrupted', message);
+  }
+
   /** Called when the system's audio output changes. */
   onOutputChange(change: { change: string; previous: { name: string; kind: string } | null; current: { name: string; kind: string } | null }): void {
     this.output = change.current;
@@ -892,7 +898,7 @@ export class Session extends EventTarget {
     const key = `${display}:${system}`;
     if (key === this.awakeKey) return;
     this.awakeKey = key;
-    void invoke('set_keep_awake', { display, system }).catch(() => undefined);
+    void keepAwake(display, system).catch(() => undefined);
   }
 
   // ---------- reading state ----------

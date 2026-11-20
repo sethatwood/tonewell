@@ -3,6 +3,7 @@
 // back to a small HTML list.
 
 import { isTauri } from '../platform/bridge';
+import { isPhone } from '../platform/os';
 
 export type MenuNode =
   | { kind: 'item'; id: string; label: string; enabled?: boolean }
@@ -17,7 +18,8 @@ export const submenu = (label: string, children: MenuNode[], enabled = true): Me
 
 /** Show a menu under `anchor`, or at `at` (a right-click), and resolve with the chosen id (or null). */
 export async function popup(nodes: MenuNode[], anchor: HTMLElement, at?: { x: number; y: number }): Promise<string | null> {
-  if (isTauri) return nativePopup(nodes, anchor, at);
+  // A phone has no native menus: the page draws its own.
+  if (isTauri && !isPhone) return nativePopup(nodes, anchor, at);
   return htmlPopup(nodes, anchor, at);
 }
 

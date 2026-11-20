@@ -8,7 +8,7 @@ import { h } from '../controls';
 import { uiIcon } from '../icons';
 import { layersIn } from '../layers';
 import { item, popup, sep } from '../menu';
-import { keys } from '../../platform/os';
+import { isPhone, keys } from '../../platform/os';
 import type { Sheet, SheetEnv } from './host';
 import { segmented } from './parts';
 
@@ -73,7 +73,7 @@ export function soundSheet(env: SheetEnv): Sheet {
       });
     }
     const words = lights.map((l) => l.label.toLowerCase());
-    env.hints.add(b, () => [{ b: `${p.name}.` }, { t: words.length ? `${words.join(', ')}.`.replace(/^./, (c) => c.toUpperCase()) : '' }, ...(p.builtin ? [] : [{ t: 'Right-click to rename, duplicate or delete.' }])]);
+    env.hints.add(b, () => [{ b: `${p.name}.` }, { t: words.length ? `${words.join(', ')}.`.replace(/^./, (c) => c.toUpperCase()) : '' }, ...(p.builtin ? [] : [{ t: `${isPhone ? 'Touch and hold' : 'Right-click'} to rename, duplicate or delete.` }])]);
     return b;
   };
 
@@ -93,7 +93,7 @@ export function soundSheet(env: SheetEnv): Sheet {
   return {
     el,
     label: 'Choose a sound',
-    rest: () => [{ k: '[' }, { k: ']' }, { t: 'step through sounds. Right-click one of yours to rename, duplicate or delete.' }],
+    rest: () => (isPhone ? [{ t: 'Touch and hold one of yours to rename, duplicate or delete it.' }] : [{ k: '[' }, { k: ']' }, { t: 'step through sounds. Right-click one of yours to rename, duplicate or delete.' }]),
     initialFocus: () => el.querySelector<HTMLElement>('.sound[aria-checked="true"]'),
     render(s: Snapshot) {
       mode.set(s.mode);
