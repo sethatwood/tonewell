@@ -429,7 +429,11 @@ export class Session extends EventTarget {
 
   private async ensureContext(): Promise<AudioContext> {
     if (!this.ctx || this.ctx.state === 'closed') {
-      this.ctx = new AudioContext({ latencyHint: 'playback' });
+      // On a phone the web view's audio thread misses the usual ~21 ms buffer's deadlines
+      // often enough to pop: through the speaker even with the screen on, and more with
+      // it locked. The longest buffer it allows (~170 ms) rides that out; nothing here
+      // needs low latency.
+      this.ctx = new AudioContext({ latencyHint: isPhone ? 0.2 : 'playback' });
       this.ctx.addEventListener('statechange', () => this.onContextState());
     }
     if (this.ctx.state !== 'running') await this.ctx.resume();

@@ -436,5 +436,12 @@ it did: the audio clock kept exact time, bells kept being scheduled and
 the system mixer kept its track active, with the page hidden. So the
 sound stays in one engine on every platform. The plugin also undoes the
 webview's own pause when the activity pauses, while a session runs.
-iPhones are a separate question (WebKit has open bugs about web audio
+A real phone (a Pixel 11 Pro on Android 17) confirmed it through a whole
+session locked and in deep Doze, ending on its own, but it also popped:
+with the usual ~21 ms buffer the webview's audio thread missed deadlines,
+dropping about 2% of the sound over Bluetooth with the screen locked and
+far more through the speaker, even unlocked. The audio clock running ahead
+of the wall clock measures it. On phones the session asks for the longest
+buffer the webview allows (~170 ms), which brought both to nothing; the
+sound has no use for low latency. iPhones are a separate question (WebKit has open bugs about web audio
 after a lock) and may still need a native engine.
