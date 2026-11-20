@@ -64,8 +64,11 @@ export async function reloadDoc(): Promise<Doc> {
   if (cache) for (const k of dirty) pending[k] = cache[k];
   cache = null;
   if (isTauri) {
-    const store = await tauriStore();
-    await store.reload();
+    try {
+      await (await tauriStore()).reload();
+    } catch {
+      // No file yet (nothing has been saved since install): there is nothing newer to read.
+    }
   }
   const doc = await loadDoc();
   Object.assign(doc, pending);
