@@ -276,6 +276,8 @@ async function applySettings(next: AppSettings, save = false): Promise<void> {
   }
   const w = await currentWindow();
   if (w && prev?.alwaysOnTop !== settings.alwaysOnTop) await w.setAlwaysOnTop(settings.alwaysOnTop);
+  // Turning "Soften during calls" off mid-call brings the sound back up.
+  if (isPhone && !settings.softenForCalls) session.setDucked(false);
   if (!isPhone) {
     if (isTauri && registeredShortcuts !== settings.shortcutsEnabled) await setShortcuts(settings.shortcutsEnabled);
     session.setDucked(micBusy && settings.softenForCalls);
@@ -393,6 +395,9 @@ function nowPlaying(s: Snapshot): NowPlaying {
 let mediaKey = '';
 function updateMedia(s: Snapshot): void {
   if (onPhone) {
+    // A session's end gives up the sound, and with it any softening for a call: no "gain"
+    // will come to undo it, and the next session starts at full volume.
+    if (s.phase === 'ready') session.setDucked(false);
     void showSession(nowPlaying(s));
     return;
   }
@@ -739,7 +744,11 @@ async function phoneBoot(): Promise<void> {
   await onPlayback('focus', ({ state }) => {
     if (state === 'transient') session.setDucked(settings.softenForCalls, 'A call or another app is speaking');
     else if (state === 'gain') session.setDucked(false);
-    else if (state === 'loss') session.interrupt('Another app is playing, so this paused.');
+    else if (state === 'loss') {
+      // No "gain" follows a loss: the softening ends here, and Resume asks for the sound back.
+      session.setDucked(false);
+      session.interrupt('Another app is playing, so this paused.');
+    }
   });
   await onPlayback('back', () => void goBack());
   routes().onChange(syncBack);

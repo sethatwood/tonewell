@@ -58,38 +58,41 @@ class PlaybackService : Service() {
     private const val CONTROL = "space.tonewell.playback.CONTROL"
 
     @Volatile private var instance: PlaybackService? = null
-    @Volatile private var pending: NowPlaying? = null
+    /** The session to show, or null once it has stopped. */
+    @Volatile private var session: NowPlaying? = null
     private val main = Handler(Looper.getMainLooper())
 
-    /** A session is running (the service exists or is starting). */
-    @Volatile var active = false
-      private set
+    /** A session is running (shown, or about to be). */
+    val active: Boolean
+      get() = session != null
 
     fun show(context: Context, now: NowPlaying) {
-      pending = now
+      session = now
       val running = instance
-      if (running != null) {
+      if (running != null && !running.stopping) {
         main.post { running.present(now) }
         return
       }
-      active = true
+      // Not running, or on its way out from the last session: (re)start it.
       ContextCompat.startForegroundService(context, Intent(context, PlaybackService::class.java))
     }
 
     fun stop(context: Context) {
-      pending = null
-      if (!active && instance == null) return
-      active = false
+      if (session == null) return
+      session = null
+      instance?.stopping = true
       context.stopService(Intent(context, PlaybackService::class.java))
     }
   }
 
-  private lateinit var session: MediaSession
+  private lateinit var media: MediaSession
   private lateinit var audio: AudioManager
   private var wake: PowerManager.WakeLock? = null
   private var focus: AudioFocusRequest? = null
   private var hasFocus = false
   private var shown: NowPlaying? = null
+  /** Asked to stop; a new session starts the service afresh rather than using this one. */
+  @Volatile var stopping = false
 
   override fun onBind(intent: Intent?): IBinder? = null
 
@@ -98,7 +101,7 @@ class PlaybackService : Service() {
     instance = this
     audio = getSystemService(AudioManager::class.java)
     channel()
-    session = MediaSession(this, "Tonewell").apply {
+    media = MediaSession(this, "Tonewell").apply {
       setCallback(object : MediaSession.Callback() {
         override fun onPlay() = control("media-play")
         override fun onPause() = control("media-pause")
@@ -127,35 +130,40 @@ class PlaybackService : Service() {
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    // A button on a notification left from an earlier session.
     if (intent?.action == CONTROL) {
       intent.getStringExtra("id")?.let { control(it) }
       if (!active) stopSelf()
       return START_NOT_STICKY
     }
-    val now = pending ?: shown
-    if (now == null) {
+    // Started with startForegroundService: Android requires startForeground promptly, every
+    // time, even if the session has already ended meanwhile.
+    val now = session ?: shown ?: NowPlaying(false, "Tonewell", null, null, emptyList())
+    ServiceCompat.startForeground(this, NOTIFICATION, notification(now), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+    val current = session
+    if (current == null) {
+      ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
       stopSelf()
       return START_NOT_STICKY
     }
-    // Must come promptly after startForegroundService, before anything else can fail.
-    ServiceCompat.startForeground(this, NOTIFICATION, notification(now), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-    present(now)
+    stopping = false
+    present(current)
     return START_NOT_STICKY
   }
 
   /** Swiping Tonewell away closes the webview, and the sound with it. */
   override fun onTaskRemoved(rootIntent: Intent?) {
-    active = false
+    session = null
+    stopping = true
     stopSelf()
   }
 
   override fun onDestroy() {
-    instance = null
-    active = false
+    if (instance === this) instance = null
     focus?.let { audio.abandonAudioFocusRequest(it) }
     hasFocus = false
-    session.isActive = false
-    session.release()
+    media.isActive = false
+    media.release()
     wake?.takeIf { it.isHeld }?.release()
     ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
     super.onDestroy()
@@ -169,14 +177,14 @@ class PlaybackService : Service() {
   fun present(now: NowPlaying) {
     shown = now
     if (now.playing && !hasFocus) requestFocus()
-    session.setMetadata(
+    media.setMetadata(
       MediaMetadata.Builder()
         .putString(MediaMetadata.METADATA_KEY_TITLE, now.title)
         .putString(MediaMetadata.METADATA_KEY_ARTIST, now.text ?: "")
         .putString(MediaMetadata.METADATA_KEY_ALBUM, now.subtext ?: "")
         .build(),
     )
-    session.setPlaybackState(playbackState(now))
+    media.setPlaybackState(playbackState(now))
     getSystemService(NotificationManager::class.java).notify(NOTIFICATION, notification(now))
   }
 
@@ -236,7 +244,7 @@ class PlaybackService : Service() {
       builder.addAction(Notification.Action.Builder(Icon.createWithResource(this, iconFor(c.id)), c.label, pending).build())
     }
     val compact = IntArray(minOf(now.controls.size, 3)) { it }
-    builder.setStyle(Notification.MediaStyle().setMediaSession(session.sessionToken).setShowActionsInCompactView(*compact))
+    builder.setStyle(Notification.MediaStyle().setMediaSession(media.sessionToken).setShowActionsInCompactView(*compact))
     return builder.build()
   }
 

@@ -62,7 +62,7 @@ export function guideSheet(env: SheetEnv, badges: (on: boolean) => void): Sheet 
   return {
     el,
     label: 'Field guide',
-    rest: () => [{ t: isPhone ? 'The numbers sit beside the controls they explain.' : 'Hover anything for a one-line explanation right here.' }],
+    rest: () => [{ t: isPhone ? 'The list follows the player from top to bottom.' : 'Hover anything for a one-line explanation right here.' }],
     initialFocus: () => close,
     dispose: () => badges(false),
     render(_s: Snapshot) {

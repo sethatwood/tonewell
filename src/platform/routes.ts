@@ -22,14 +22,15 @@ function create(): Routes {
   const frames = new Map<string, HTMLIFrameElement>();
   const listeners: Array<() => void> = [];
   const changed = () => listeners.forEach((cb) => cb());
+  let layer = 10;
   return {
     open(label, url, title) {
       const existing = frames.get(label);
       if (existing) {
-        // Bring it to the front.
+        // Bring it to the front. Not by moving it in the page: a moved frame reloads.
         frames.delete(label);
         frames.set(label, existing);
-        document.body.append(existing);
+        existing.style.zIndex = String(++layer);
         existing.focus();
         changed();
         return;
@@ -39,6 +40,7 @@ function create(): Routes {
       f.dataset.label = label;
       f.title = title;
       f.src = url;
+      f.style.zIndex = String(++layer);
       f.dataset.entering = '';
       frames.set(label, f);
       document.body.append(f);

@@ -2,6 +2,7 @@
 
 import { loadDoc, patchDoc, reloadDoc } from '../platform/store';
 import { emit } from '../platform/bridge';
+import { isPhone } from '../platform/os';
 
 export interface AppSettings {
   alwaysOnTop: boolean;
@@ -40,7 +41,9 @@ export const SETTINGS_DEFAULT: AppSettings = {
   firstRunDone: false,
   keepLog: true,
   visualsPalette: 0,
-  softenForCalls: false,
+  // A computer can only tell a call is on by watching for a microphone in use, so that waits to
+  // be asked for; a phone is simply told, as every media app is.
+  softenForCalls: isPhone,
   showInDock: true,
   checkUpdates: true,
   learnScale: 1,

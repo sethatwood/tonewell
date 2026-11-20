@@ -416,9 +416,13 @@ plugin (`src-tauri/plugins/playback`). On a phone:
   screen off and shows the session in the notification and on the lock
   screen, in the menu bar's words, with its ladder: the system's pause
   winds down, play resumes, a square ends. Headphone buttons do the same.
-- A call, or another app speaking briefly, softens the sound (when
-  "Soften during calls" is on); another app starting to play pauses it
-  quietly, waiting for Resume or End, as unplugging headphones does.
+- A call, or another app speaking briefly, softens the sound ("Soften
+  during calls", on by default here: Android says when a call is on,
+  where a computer would have to watch for a microphone in use); another
+  app starting to play pauses it quietly, waiting for Resume or End, as
+  unplugging headphones does.
+- Back closes what is open over the player; otherwise it sends Tonewell
+  to the background and the session plays on.
   Headphones coming out are reported the moment Android announces it.
 - Hints stop at the first key (there are none), mouse words become
   touch words, and Meditate doesn't keep the screen on by default.

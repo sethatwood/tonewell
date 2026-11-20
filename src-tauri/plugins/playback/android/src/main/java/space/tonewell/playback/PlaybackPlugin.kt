@@ -46,20 +46,24 @@ class SwitchArgs {
 class PlaybackPlugin(private val activity: Activity) : Plugin(activity) {
   private var webView: WebView? = null
   private var outputs: Outputs? = null
-  private var back: OnBackPressedCallback? = null
+  /** Something is open over the player (a sheet, a page): Back is the page's to handle. */
+  @Volatile private var pageBack = false
 
   override fun load(webView: WebView) {
     this.webView = webView
     Playback.onControl = { id -> trigger("action", JSObject().put("id", id)) }
     Playback.onFocus = { state -> trigger("focus", JSObject().put("state", state)) }
     outputs = Outputs(activity.applicationContext) { change -> trigger("output", change) }.also { it.start() }
+    // Back closes what is open over the player; otherwise it only sends Tonewell to the
+    // background, as Android 12 and later do by themselves. Older Androids would close the
+    // activity, and with it the webview making the sound, cutting it off mid-session.
     (activity as? AppCompatActivity)?.let { owner ->
       owner.runOnUiThread {
-        val callback = object : OnBackPressedCallback(false) {
-          override fun handleOnBackPressed() = trigger("back", JSObject())
-        }
-        owner.onBackPressedDispatcher.addCallback(owner, callback)
-        back = callback
+        owner.onBackPressedDispatcher.addCallback(owner, object : OnBackPressedCallback(true) {
+          override fun handleOnBackPressed() {
+            if (pageBack) trigger("back", JSObject()) else owner.moveTaskToBack(true)
+          }
+        })
       }
     }
   }
@@ -125,8 +129,7 @@ class PlaybackPlugin(private val activity: Activity) : Plugin(activity) {
   /** While a sheet or a page is open, Back closes it (a `back` event) instead of leaving the app. */
   @Command
   fun handleBack(invoke: Invoke) {
-    val on = invoke.parseArgs(SwitchArgs::class.java).on
-    activity.runOnUiThread { back?.isEnabled = on }
+    pageBack = invoke.parseArgs(SwitchArgs::class.java).on
     invoke.resolve()
   }
 }

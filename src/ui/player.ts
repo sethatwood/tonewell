@@ -311,7 +311,7 @@ export class Player {
     // Tools: shown when the pointer is over the window or focus is inside it
     this.shapeBtn = this.tool('shape', 'Shape the sound', () => actions.toggleSheet('shape', this.shapeBtn), () => [{ b: 'Shape:' }, { t: 'warmer, stiller, more rain.' }]);
     this.shapeBtn.setAttribute('aria-expanded', 'false');
-    const visualsBtn = this.tool('visuals', 'Open visuals', () => actions.openVisuals(), () => [{ b: 'Visuals,' }, { t: isMac ? 'in their own window.' : 'in a window.' }, { k: keys('⇧⌘V') }]);
+    const visualsBtn = this.tool('visuals', 'Open visuals', () => actions.openVisuals(), () => [{ b: 'Visuals,' }, { t: isMac ? 'in their own window.' : isPhone ? 'full screen.' : 'in a window.' }, { k: keys('⇧⌘V') }]);
     this.helpBtn = this.tool('help', 'Field guide', () => actions.toggleSheet('guide', this.helpBtn), () => [{ b: 'Field guide.' }, { t: 'What everything does.' }, { k: '?' }]);
     this.helpBtn.setAttribute('aria-expanded', 'false');
     this.helpBtn.setAttribute('aria-keyshortcuts', '?');
