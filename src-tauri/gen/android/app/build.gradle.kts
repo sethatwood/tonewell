@@ -14,8 +14,22 @@ val tauriProperties = Properties().apply {
     }
 }
 
+// The Play upload key, given by scripts/android-release.sh from the keychain. Without it a
+// release build is left unsigned; Google Play re-signs uploads with its own app signing key.
+val uploadStore: String? = System.getenv("TONEWELL_UPLOAD_STORE")
+
 android {
     compileSdk = 37
+    signingConfigs {
+        if (uploadStore != null) {
+            create("upload") {
+                storeFile = file(uploadStore)
+                storePassword = System.getenv("TONEWELL_UPLOAD_PASSWORD")
+                keyAlias = System.getenv("TONEWELL_UPLOAD_ALIAS") ?: "upload"
+                keyPassword = System.getenv("TONEWELL_UPLOAD_PASSWORD")
+            }
+        }
+    }
     namespace = "space.tonewell.app"
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
@@ -39,6 +53,7 @@ android {
             }
         }
         getByName("release") {
+            if (uploadStore != null) signingConfig = signingConfigs.getByName("upload")
             optimization {
                enable = true
             }

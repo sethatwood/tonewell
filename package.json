@@ -19,7 +19,8 @@
     "release": "bash scripts/release.sh",
     "site": "vite build --config vite.site.config.ts",
     "site:og": "node scripts/site-og.mjs",
-    "site:scenes": "node scripts/site-scenes.mjs"
+    "site:scenes": "node scripts/site-scenes.mjs",
+    "android:release": "bash scripts/android-release.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.5",
